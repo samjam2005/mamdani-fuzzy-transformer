@@ -33,7 +33,10 @@ class PipelineTests(unittest.TestCase):
 
     def test_transformer_output_shape_and_gradients(self) -> None:
         torch.manual_seed(2)
-        model = VolatilityTransformer(sequence_length=5, d_model=8, nhead=2, dim_feedforward=16)
+        model = VolatilityTransformer(
+            sequence_length=5, d_model=8, nhead=2, dim_feedforward=16,
+            mamdani_rules=3,
+        )
         x = torch.randn(4, 5, 1)
         prediction = model(x)
         self.assertEqual(tuple(prediction.shape), (4,))
@@ -71,6 +74,7 @@ class PipelineTests(unittest.TestCase):
             nhead=2,
             num_layers=2,
             dim_feedforward=16,
+            mamdani_rules=3,
         )
         self.assertEqual(len(model.encoder.layers), 2)
         self.assertTrue(
@@ -115,6 +119,23 @@ class PipelineTests(unittest.TestCase):
             mamdani_rules=0,
         )
         self.assertTrue(all(layer.mamdani is None for layer in model.encoder.layers))
+
+    def test_fantf_attention_perturbs_scores_and_learns_per_layer_scale(self) -> None:
+        torch.manual_seed(7)
+        attention = MultiHeadSelfAttention(
+            d_model=4, nhead=2, fuzzy_attention=True, fuzzy_attention_delta=0.5
+        )
+        x = torch.randn(2, 3, 4)
+        output, weights = attention(x, return_attention=True)
+        self.assertEqual(tuple(output.shape), (2, 3, 4))
+        self.assertEqual(tuple(weights.shape), (2, 2, 3, 3))
+        output.sum().backward()
+        self.assertIsNotNone(attention.fuzziness_param.grad)
+
+    def test_pure_fantf_default_has_no_mamdani_post_layer(self) -> None:
+        model = VolatilityTransformer(sequence_length=5, d_model=8, nhead=2)
+        self.assertTrue(all(layer.mamdani is None for layer in model.encoder.layers))
+        self.assertTrue(all(layer.self_attention.fuzzy_attention for layer in model.encoder.layers))
 
     def test_residual_transformer_starts_at_persistence(self) -> None:
         model = VolatilityTransformer(

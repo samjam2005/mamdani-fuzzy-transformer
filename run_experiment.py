@@ -44,10 +44,15 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--quantile-fuzzifier", action="store_true")
     parser.add_argument("--freeze-fuzzifier", action="store_true")
     parser.add_argument(
+        "--no-fuzzy-attention", dest="fuzzy_attention", action="store_false", default=True
+    )
+    parser.add_argument("--fuzzy-attention-delta", type=float, default=0.5)
+    parser.add_argument("--freeze-fuzzy-attention", action="store_true")
+    parser.add_argument(
         "--mamdani-rules",
         type=int,
-        default=3,
-        help="Mamdani rules per hidden feature in every encoder layer; zero disables them",
+        default=0,
+        help="Optional Mamdani rules per hidden feature; zero gives the pure FANTF-style model",
     )
     parser.add_argument("--mamdani-universe-points", type=int, default=101)
     parser.add_argument("--validation-only", action="store_true")
@@ -78,6 +83,9 @@ if __name__ == "__main__":
         fuzzy_memberships=arguments.fuzzy_memberships,
         quantile_fuzzifier=arguments.quantile_fuzzifier,
         freeze_fuzzifier=arguments.freeze_fuzzifier,
+        fuzzy_attention=arguments.fuzzy_attention,
+        fuzzy_attention_delta=arguments.fuzzy_attention_delta,
+        freeze_fuzzy_attention=arguments.freeze_fuzzy_attention,
         mamdani_rules=arguments.mamdani_rules,
         mamdani_universe_points=arguments.mamdani_universe_points,
         validation_examples=arguments.validation_examples,

@@ -1,0 +1,12 @@
+{
+  "model": "ieRSPOP++ BCM",
+  "evaluation": "chronological prequential (predict then learn)",
+  "total_examples": 860,
+  "test_examples": 374,
+  "first_test_window_matlab": 487,
+  "rmse": 2.1419790608082185,
+  "mae": 1.7207045409383748,
+  "pearson_r": 0.904371602082607,
+  "predictive_r_squared": 0.74527242498440871,
+  "reported_rule_count": 227.94621291438781
+}

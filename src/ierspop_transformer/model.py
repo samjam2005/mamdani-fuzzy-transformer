@@ -130,9 +130,17 @@ class MamdaniFuzzyLayer(nn.Module):
 
 
 class MultiHeadSelfAttention(nn.Module):
-    """Multi-head self-attention written from the underlying tensor operations."""
+    """Custom multi-head attention with optional FANTF-style fuzzy scores."""
 
-    def __init__(self, d_model: int, nhead: int, dropout: float = 0.0) -> None:
+    def __init__(
+        self,
+        d_model: int,
+        nhead: int,
+        dropout: float = 0.0,
+        fuzzy_attention: bool = False,
+        fuzzy_attention_delta: float = 0.5,
+        freeze_fuzzy_attention: bool = False,
+    ) -> None:
         super().__init__()
         if d_model <= 0:
             raise ValueError("d_model must be positive")
@@ -140,6 +148,8 @@ class MultiHeadSelfAttention(nn.Module):
             raise ValueError("nhead must be positive and divide d_model")
         if not 0.0 <= dropout < 1.0:
             raise ValueError("dropout must be in [0, 1)")
+        if fuzzy_attention_delta < 0.0:
+            raise ValueError("fuzzy_attention_delta must be non-negative")
 
         self.d_model = d_model
         self.nhead = nhead
@@ -149,6 +159,14 @@ class MultiHeadSelfAttention(nn.Module):
         self.value_projection = nn.Linear(d_model, d_model)
         self.output_projection = nn.Linear(d_model, d_model)
         self.attention_dropout = nn.Dropout(dropout)
+        self.fuzzy_attention = fuzzy_attention
+        self.fuzzy_attention_delta = fuzzy_attention_delta
+        if fuzzy_attention:
+            self.fuzziness_param = nn.Parameter(
+                torch.tensor(1.0), requires_grad=not freeze_fuzzy_attention
+            )
+        else:
+            self.register_parameter("fuzziness_param", None)
 
     def _split_heads(self, values: torch.Tensor) -> torch.Tensor:
         batch_size, sequence_length, _ = values.shape
@@ -174,10 +192,14 @@ class MultiHeadSelfAttention(nn.Module):
         keys = self._split_heads(self.key_projection(x))
         values = self._split_heads(self.value_projection(x))
 
-        scores = torch.matmul(queries, keys.transpose(-2, -1)) / math.sqrt(
-            self.head_dim
-        )
-        attention = F.softmax(scores, dim=-1)
+        scores = torch.matmul(queries, keys.transpose(-2, -1))
+        if self.fuzzy_attention:
+            scores = scores + (
+                self.fuzzy_attention_delta
+                * self.fuzziness_param
+                * torch.randn_like(scores)
+            )
+        attention = F.softmax(scores / math.sqrt(self.head_dim), dim=-1)
         attended = torch.matmul(self.attention_dropout(attention), values)
         output = self.output_projection(self._merge_heads(attended))
         if return_attention:
@@ -205,7 +227,7 @@ class PositionwiseFeedForward(nn.Module):
 
 
 class TransformerEncoderBlock(nn.Module):
-    """Attention, feed-forward, and Mamdani fuzzy inference residual block."""
+    """FANTF-style attention, feed-forward, and optional Mamdani residual block."""
 
     def __init__(
         self,
@@ -213,12 +235,22 @@ class TransformerEncoderBlock(nn.Module):
         nhead: int,
         dim_feedforward: int,
         dropout: float = 0.0,
+        fuzzy_attention: bool = True,
+        fuzzy_attention_delta: float = 0.5,
+        freeze_fuzzy_attention: bool = False,
         mamdani_rules: int = 3,
         mamdani_universe_points: int = 101,
     ) -> None:
         super().__init__()
         self.attention_norm = nn.LayerNorm(d_model)
-        self.self_attention = MultiHeadSelfAttention(d_model, nhead, dropout)
+        self.self_attention = MultiHeadSelfAttention(
+            d_model,
+            nhead,
+            dropout,
+            fuzzy_attention=fuzzy_attention,
+            fuzzy_attention_delta=fuzzy_attention_delta,
+            freeze_fuzzy_attention=freeze_fuzzy_attention,
+        )
         self.feedforward_norm = nn.LayerNorm(d_model)
         self.feedforward = PositionwiseFeedForward(
             d_model, dim_feedforward, dropout
@@ -252,6 +284,9 @@ class TransformerEncoder(nn.Module):
         num_layers: int,
         dim_feedforward: int,
         dropout: float = 0.0,
+        fuzzy_attention: bool = True,
+        fuzzy_attention_delta: float = 0.5,
+        freeze_fuzzy_attention: bool = False,
         mamdani_rules: int = 3,
         mamdani_universe_points: int = 101,
     ) -> None:
@@ -265,6 +300,9 @@ class TransformerEncoder(nn.Module):
                     nhead=nhead,
                     dim_feedforward=dim_feedforward,
                     dropout=dropout,
+                    fuzzy_attention=fuzzy_attention,
+                    fuzzy_attention_delta=fuzzy_attention_delta,
+                    freeze_fuzzy_attention=freeze_fuzzy_attention,
                     mamdani_rules=mamdani_rules,
                     mamdani_universe_points=mamdani_universe_points,
                 )
@@ -301,7 +339,10 @@ class VolatilityTransformer(nn.Module):
         fuzzy_centers: torch.Tensor | None = None,
         fuzzy_widths: torch.Tensor | None = None,
         freeze_fuzzifier: bool = False,
-        mamdani_rules: int = 3,
+        fuzzy_attention: bool = True,
+        fuzzy_attention_delta: float = 0.5,
+        freeze_fuzzy_attention: bool = False,
+        mamdani_rules: int = 0,
         mamdani_universe_points: int = 101,
     ) -> None:
         super().__init__()
@@ -315,6 +356,8 @@ class VolatilityTransformer(nn.Module):
             raise ValueError("fuzzy_memberships must be zero or at least two")
         if mamdani_rules == 1 or mamdani_rules < 0:
             raise ValueError("mamdani_rules must be zero or at least two")
+        if fuzzy_attention_delta < 0.0:
+            raise ValueError("fuzzy_attention_delta must be non-negative")
         self.sequence_length = sequence_length
         self.persistence_residual = persistence_residual
         self.gated_residual = gated_residual
@@ -339,6 +382,9 @@ class VolatilityTransformer(nn.Module):
             num_layers=num_layers,
             dim_feedforward=dim_feedforward,
             dropout=dropout,
+            fuzzy_attention=fuzzy_attention,
+            fuzzy_attention_delta=fuzzy_attention_delta,
+            freeze_fuzzy_attention=freeze_fuzzy_attention,
             mamdani_rules=mamdani_rules,
             mamdani_universe_points=mamdani_universe_points,
         )

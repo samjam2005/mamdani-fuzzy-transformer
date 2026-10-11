@@ -73,6 +73,9 @@ def _make_model(
         fuzzy_centers=fuzzy_centers,
         fuzzy_widths=fuzzy_widths,
         freeze_fuzzifier=config.freeze_fuzzifier,
+        fuzzy_attention=config.fuzzy_attention,
+        fuzzy_attention_delta=config.fuzzy_attention_delta,
+        freeze_fuzzy_attention=config.freeze_fuzzy_attention,
         mamdani_rules=config.mamdani_rules,
         mamdani_universe_points=config.mamdani_universe_points,
     )
@@ -373,11 +376,24 @@ def run_experiment(
     persistence = regression_metrics(actual, x_raw[test_start:, -1, 0])
     result = {
         "model": (
-            "MamdaniVolatilityTransformer"
+            "FANTFStyleMamdaniVolatilityTransformer"
+            if config.fuzzy_attention and config.mamdani_rules
+            else "FANTFStyleVolatilityTransformer"
+            if config.fuzzy_attention
+            else "MamdaniVolatilityTransformer"
             if config.mamdani_rules
             else "VolatilityTransformer"
         ),
         "encoder_implementation": "explicit multi-head self-attention and feed-forward blocks",
+        "fuzzy_attention": (
+            {
+                "type": "FANTF-style Gaussian score perturbation",
+                "delta": config.fuzzy_attention_delta,
+                "learnable_fuzziness_per_encoder_layer": not config.freeze_fuzzy_attention,
+            }
+            if config.fuzzy_attention
+            else None
+        ),
         "layer_fuzzy_inference": (
             {
                 "type": "Mamdani",

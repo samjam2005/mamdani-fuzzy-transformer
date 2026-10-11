@@ -1,4 +1,4 @@
-# Custom Transformer with Mamdani layer fuzzification
+# Custom FANTF-style Transformer with optional Mamdani layer fuzzification
 
 This folder is the Python implementation of the Week 8 milestone. It replaces
 the BCM association update in Aparna Iyer's `update_ron_online_rule.m` with a
@@ -14,8 +14,9 @@ The experiment deliberately preserves the parts needed for a fair comparison:
 - RMSE, MAE, Pearson correlation, and predictive R-squared.
 
 The original fuzzy DIC, rough-set, fuzzy-rule, and ensemble conversion remains
-outside this implementation. The Transformer itself now contains a Mamdani
-fuzzy inference system in every encoder layer.
+outside this implementation. The default Transformer uses FANTF-style fuzzy
+attention in every encoder layer; an explicit Mamdani post-layer system remains
+available as an optional hybrid ablation.
 
 ## What was replaced
 
@@ -31,7 +32,7 @@ The Python model replaces this learned association path with:
 ```text
 five observed volatility tokens
     -> scalar embedding + learned positions
-    -> multi-head self-attention
+    -> FANTF-style fuzzy multi-head self-attention
     -> feed-forward network
     -> Mamdani fuzzy inference
     -> correction to the latest observed volatility
@@ -60,7 +61,23 @@ The module breakdown follows the encoder described by Harvard NLP's
 adapted to an encoder-only scalar forecasting model. This project retains its
 existing pre-normalized residual layout and learned temporal position vectors.
 
-### Mamdani inference in every encoder layer
+### FANTF-style fuzzy attention in every encoder layer
+
+Every layer starts with custom scaled dot-product attention. Before softmax, it
+adds a learnable per-layer Gaussian perturbation to each query-key score:
+
+```text
+fuzzy_score(i, j) = Q_i K_j / sqrt(d_head) + delta * alpha * N(0, 1)
+attention = softmax(fuzzy_score)
+```
+
+`alpha` is a learned fuzziness scale and `delta` is the experiment
+hyperparameter (default `0.5`). This follows FANTF's fuzzy-attention mechanism,
+while Q/K/V projections and all attention operations remain implemented
+directly in `src/ierspop_transformer/model.py`. Use `--no-fuzzy-attention` for
+the plain custom-attention ablation.
+
+### Optional Mamdani inference after every encoder layer
 
 After the attention and feed-forward sublayers, every hidden feature passes
 through its layer's own Mamdani system:
@@ -84,8 +101,10 @@ defuzzification configuration documented by
 from Mamdani and Assilian's
 [linguistic fuzzy controller](https://doi.org/10.1016/S0020-7373(75)80002-2).
 
-The default is three rules per hidden feature. Use `--mamdani-rules 0` to run
-the capacity-matched custom Transformer baseline without layer fuzzification.
+The default is `--mamdani-rules 0`, which is the pure FANTF-style model. Set
+`--mamdani-rules 3` to run the FANTF + Mamdani hybrid. Use both
+`--no-fuzzy-attention` and `--mamdani-rules 0` for the capacity-matched plain
+custom Transformer baseline.
 When `--num-layers` is greater than one, each encoder layer receives a separate
 Mamdani system with independently learned antecedent parameters.
 

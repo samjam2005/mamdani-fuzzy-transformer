@@ -25,7 +25,10 @@ class ExperimentConfig:
     fuzzy_memberships: int = 0
     quantile_fuzzifier: bool = False
     freeze_fuzzifier: bool = False
-    mamdani_rules: int = 3
+    fuzzy_attention: bool = True
+    fuzzy_attention_delta: float = 0.5
+    freeze_fuzzy_attention: bool = False
+    mamdani_rules: int = 0
     mamdani_universe_points: int = 101
     seed: int = 42
 

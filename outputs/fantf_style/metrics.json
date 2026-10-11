@@ -1,0 +1,79 @@
+{
+  "model": "FANTFStyleVolatilityTransformer",
+  "encoder_implementation": "explicit multi-head self-attention and feed-forward blocks",
+  "fuzzy_attention": {
+    "type": "FANTF-style Gaussian score perturbation",
+    "delta": 0.5,
+    "learnable_fuzziness_per_encoder_layer": true
+  },
+  "layer_fuzzy_inference": null,
+  "replaced_matlab_component": "BCM association learner in update_ron_online_rule.m",
+  "evaluation": "chronological prequential (predict then learn)",
+  "dataset": "/Users/sam/.codex/.chatgpt-projects/g-p-6a8aedff1e2081919896094d898a5d98/ierspop/extended/data/otmVolatility.mat",
+  "total_examples": 860,
+  "warmup_examples": 486,
+  "test_examples": 374,
+  "first_test_window_matlab": 487,
+  "normalization": {
+    "mean": 22.843788146972656,
+    "std": 3.2824623584747314
+  },
+  "config": {
+    "sequence_length": 5,
+    "test_start_matlab": 487,
+    "d_model": 8,
+    "nhead": 2,
+    "num_layers": 1,
+    "dim_feedforward": 32,
+    "dropout": 0.0,
+    "learning_rate": 0.001,
+    "weight_decay": 1e-05,
+    "batch_size": 32,
+    "warmup_epochs": 120,
+    "online_steps": 1,
+    "replay_window": 120,
+    "validation_examples": 100,
+    "persistence_residual": true,
+    "gated_residual": false,
+    "engineered_features": false,
+    "fuzzy_memberships": 0,
+    "quantile_fuzzifier": false,
+    "freeze_fuzzifier": false,
+    "fuzzy_attention": true,
+    "fuzzy_attention_delta": 0.5,
+    "freeze_fuzzy_attention": false,
+    "mamdani_rules": 0,
+    "mamdani_universe_points": 101,
+    "seed": 42
+  },
+  "metrics": {
+    "rmse": 1.4063436927352595,
+    "mae": 1.051106682435714,
+    "pearson_r": 0.946954735577683,
+    "predictive_r_squared": 0.8901933964031782
+  },
+  "persistence_baseline": {
+    "rmse": 1.3727193044355621,
+    "mae": 0.9157754010695187,
+    "pearson_r": 0.947584287623831,
+    "predictive_r_squared": 0.8953813765223967
+  },
+  "validation": {
+    "examples": 100,
+    "metrics": {
+      "rmse": 1.5832441187490254,
+      "mae": 1.151030616760254,
+      "pearson_r": 0.8720835693606029,
+      "predictive_r_squared": 0.7562522440898339
+    },
+    "persistence_baseline": {
+      "rmse": 1.6485751118138365,
+      "mae": 1.115999984741211,
+      "pearson_r": 0.8684633744477606,
+      "predictive_r_squared": 0.7357211931883667
+    }
+  },
+  "published_ierspoppp_rmse": 1.8045,
+  "warmup_final_normalized_mse": 0.14729119769830273,
+  "parameter_count": 954
+}
