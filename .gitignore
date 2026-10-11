@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+
+# Generated experiment artifacts and report renders.
+outputs/
+output/
+tmp/
+
+# Local editor and operating-system metadata.
+.DS_Store
+.idea/
+.vscode/
