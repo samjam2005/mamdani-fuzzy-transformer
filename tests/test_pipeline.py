@@ -20,6 +20,7 @@ from ierspop_transformer.model import (
     MamdaniFuzzyLayer,
     MultiHeadSelfAttention,
     VolatilityTransformer,
+    membership_degree,
 )
 
 
@@ -108,6 +109,39 @@ class PipelineTests(unittest.TestCase):
         self.assertAlmostEqual(float(crisp[0, 1, 0]), 0.0, places=6)
         self.assertGreater(float(crisp[0, 2, 0]), 0.0)
         torch.testing.assert_close(crisp[0, 0, 0], -crisp[0, 2, 0])
+
+    def test_supported_membership_curve_shapes(self) -> None:
+        distances = torch.tensor([0.0, 0.5, 1.0, 1.5, 2.0])
+        for curve in ("gaussian", "triangular", "trapezoidal", "parabolic"):
+            memberships = membership_degree(distances, curve)
+            self.assertAlmostEqual(float(memberships[0]), 1.0)
+            self.assertTrue(torch.all(memberships[:-1] >= memberships[1:]))
+
+        self.assertGreater(float(membership_degree(distances, "gaussian")[-1]), 0.0)
+        self.assertEqual(float(membership_degree(distances, "triangular")[2]), 0.0)
+        self.assertEqual(float(membership_degree(distances, "parabolic")[2]), 0.0)
+        trapezoidal = membership_degree(distances, "trapezoidal")
+        self.assertEqual(float(trapezoidal[1]), 1.0)
+        self.assertEqual(float(trapezoidal[3]), 0.0)
+
+    def test_every_mamdani_curve_is_differentiable(self) -> None:
+        for curve in ("gaussian", "triangular", "trapezoidal", "parabolic"):
+            fuzzy_layer = MamdaniFuzzyLayer(
+                d_model=2,
+                rule_count=3,
+                universe_points=51,
+                antecedent_curve=curve,
+            )
+            output = fuzzy_layer(torch.tensor([[[-0.3, 0.4]]]))
+            output.sum().backward()
+            self.assertIsNotNone(fuzzy_layer.antecedent_centers.grad)
+            self.assertTrue(
+                torch.all(torch.isfinite(fuzzy_layer.antecedent_centers.grad))
+            )
+
+    def test_unknown_membership_curve_is_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            MamdaniFuzzyLayer(d_model=1, antecedent_curve="not-a-curve")
 
     def test_mamdani_layer_fuzzification_can_be_disabled(self) -> None:
         model = VolatilityTransformer(

@@ -103,10 +103,42 @@ from Mamdani and Assilian's
 
 The default is `--mamdani-rules 0`, which is the pure FANTF-style model. Set
 `--mamdani-rules 3` to run the FANTF + Mamdani hybrid. Use both
-`--no-fuzzy-attention` and `--mamdani-rules 0` for the capacity-matched plain
+`--no-fuzzy-attention` and `--mamdani-rules 0` for the same-backbone plain
 custom Transformer baseline.
 When `--num-layers` is greater than one, each encoder layer receives a separate
 Mamdani system with independently learned antecedent parameters.
+
+The Mamdani antecedents can use `gaussian`, `triangular`, `trapezoidal`, or
+`parabolic` membership curves. For example:
+
+```bash
+/Users/sam/anaconda3/bin/python3 run_experiment.py \
+  --mamdani-rules 3 --mamdani-antecedent-curve trapezoidal
+```
+
+The consequent sets remain triangular so that a curve ablation changes only
+one part of the fuzzy system. Centers and widths stay learnable for all four
+families, and the number of trainable parameters is identical.
+
+## Transformer and curve ablation study
+
+`run_ablation_study.py` performs the fair pre-test comparison used for model
+selection. It compares a plain custom Transformer, FANTF, Mamdani with each
+curve, and FANTF + Mamdani with each curve. Every configuration uses the same
+chronological folds, seeds, training schedule, and backbone dimensions:
+
+```bash
+/Users/sam/anaconda3/bin/python3 run_ablation_study.py
+```
+
+The default study uses three rolling validation folds and seeds 42, 52, and 62.
+It writes raw fold results, an aggregate table, a membership-curve diagram, and
+an RMSE comparison plot to `outputs/ablation_study/`. The held-out test period
+is not used to rank configurations; after selection, run the winner once with
+`run_experiment.py` for the final test result.
+
+The completed three-seed study and its interpretation are in
+[`ABLATION_RESULTS.md`](ABLATION_RESULTS.md).
 
 ## MATLAB-to-Python mapping
 

@@ -30,6 +30,7 @@ class ExperimentConfig:
     freeze_fuzzy_attention: bool = False
     mamdani_rules: int = 0
     mamdani_universe_points: int = 101
+    mamdani_antecedent_curve: str = "gaussian"
     seed: int = 42
 
     def to_dict(self) -> dict:

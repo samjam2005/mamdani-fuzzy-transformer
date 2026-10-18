@@ -7,6 +7,32 @@ from torch import nn
 from torch.nn import functional as F
 
 
+MEMBERSHIP_CURVES = ("gaussian", "triangular", "trapezoidal", "parabolic")
+
+
+def membership_degree(
+    normalized_distance: torch.Tensor, curve: str
+) -> torch.Tensor:
+    """Evaluate one of the supported fuzzy membership curve families.
+
+    ``normalized_distance`` is ``(value - center) / width``. Compact curves
+    use ``width`` as their shoulder scale; the trapezoid has a flat top up to
+    0.5 widths and reaches zero at 1.5 widths.
+    """
+    if curve not in MEMBERSHIP_CURVES:
+        raise ValueError(
+            f"membership curve must be one of {MEMBERSHIP_CURVES}, got {curve!r}"
+        )
+    absolute_distance = normalized_distance.abs()
+    if curve == "gaussian":
+        return torch.exp(-0.5 * normalized_distance.square())
+    if curve == "triangular":
+        return torch.clamp(1.0 - absolute_distance, min=0.0)
+    if curve == "trapezoidal":
+        return torch.clamp(1.5 - absolute_distance, min=0.0, max=1.0)
+    return torch.clamp(1.0 - normalized_distance.square(), min=0.0)
+
+
 class GaussianFuzzifier(nn.Module):
     """Learnable low-to-high Gaussian memberships for a scalar token."""
 
@@ -47,7 +73,7 @@ class GaussianFuzzifier(nn.Module):
 class MamdaniFuzzyLayer(nn.Module):
     """Feature-wise differentiable Mamdani inference for hidden activations.
 
-    Every hidden feature has its own learnable Gaussian antecedents. Each rule
+    Every hidden feature has its own learnable antecedents. Each rule
     maps an ordered input fuzzy set to the corresponding triangular output set.
     Rule implication uses minimum, aggregation uses maximum, and the crisp
     result is the centroid of the aggregated output membership function.
@@ -58,6 +84,7 @@ class MamdaniFuzzyLayer(nn.Module):
         d_model: int,
         rule_count: int = 3,
         universe_points: int = 101,
+        antecedent_curve: str = "gaussian",
     ) -> None:
         super().__init__()
         if d_model <= 0:
@@ -66,6 +93,11 @@ class MamdaniFuzzyLayer(nn.Module):
             raise ValueError("rule_count must be at least two")
         if universe_points < 3:
             raise ValueError("universe_points must be at least three")
+        if antecedent_curve not in MEMBERSHIP_CURVES:
+            raise ValueError(
+                f"antecedent_curve must be one of {MEMBERSHIP_CURVES}"
+            )
+        self.antecedent_curve = antecedent_curve
 
         rule_centers = torch.linspace(-1.0, 1.0, rule_count)
         rule_spacing = 2.0 / (rule_count - 1)
@@ -108,7 +140,7 @@ class MamdaniFuzzyLayer(nn.Module):
         distances = (
             bounded_values.unsqueeze(-1) - self.antecedent_centers
         ) / widths
-        firing_strengths = torch.exp(-0.5 * distances.square())
+        firing_strengths = membership_degree(distances, self.antecedent_curve)
 
         implied_sets = torch.minimum(
             firing_strengths.unsqueeze(-1),
@@ -240,6 +272,7 @@ class TransformerEncoderBlock(nn.Module):
         freeze_fuzzy_attention: bool = False,
         mamdani_rules: int = 3,
         mamdani_universe_points: int = 101,
+        mamdani_antecedent_curve: str = "gaussian",
     ) -> None:
         super().__init__()
         self.attention_norm = nn.LayerNorm(d_model)
@@ -261,6 +294,7 @@ class TransformerEncoderBlock(nn.Module):
                 d_model=d_model,
                 rule_count=mamdani_rules,
                 universe_points=mamdani_universe_points,
+                antecedent_curve=mamdani_antecedent_curve,
             )
             if mamdani_rules
             else None
@@ -289,6 +323,7 @@ class TransformerEncoder(nn.Module):
         freeze_fuzzy_attention: bool = False,
         mamdani_rules: int = 3,
         mamdani_universe_points: int = 101,
+        mamdani_antecedent_curve: str = "gaussian",
     ) -> None:
         super().__init__()
         if num_layers <= 0:
@@ -305,6 +340,7 @@ class TransformerEncoder(nn.Module):
                     freeze_fuzzy_attention=freeze_fuzzy_attention,
                     mamdani_rules=mamdani_rules,
                     mamdani_universe_points=mamdani_universe_points,
+                    mamdani_antecedent_curve=mamdani_antecedent_curve,
                 )
                 for _ in range(num_layers)
             ]
@@ -344,6 +380,7 @@ class VolatilityTransformer(nn.Module):
         freeze_fuzzy_attention: bool = False,
         mamdani_rules: int = 0,
         mamdani_universe_points: int = 101,
+        mamdani_antecedent_curve: str = "gaussian",
     ) -> None:
         super().__init__()
         if sequence_length <= 0 or input_features <= 0:
@@ -387,6 +424,7 @@ class VolatilityTransformer(nn.Module):
             freeze_fuzzy_attention=freeze_fuzzy_attention,
             mamdani_rules=mamdani_rules,
             mamdani_universe_points=mamdani_universe_points,
+            mamdani_antecedent_curve=mamdani_antecedent_curve,
         )
         self.output_norm = nn.LayerNorm(d_model)
         self.regression_head = nn.Linear(d_model, 1)

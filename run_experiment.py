@@ -55,6 +55,13 @@ def parse_arguments() -> argparse.Namespace:
         help="Optional Mamdani rules per hidden feature; zero gives the pure FANTF-style model",
     )
     parser.add_argument("--mamdani-universe-points", type=int, default=101)
+    parser.add_argument(
+        "--mamdani-antecedent-curve",
+        choices=("gaussian", "triangular", "trapezoidal", "parabolic"),
+        default="gaussian",
+        help="Membership curve used by each Mamdani antecedent",
+    )
+    parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--validation-only", action="store_true")
     parser.add_argument("--rolling-validation", action="store_true")
     parser.add_argument("--rolling-folds", type=int, default=3)
@@ -88,7 +95,9 @@ if __name__ == "__main__":
         freeze_fuzzy_attention=arguments.freeze_fuzzy_attention,
         mamdani_rules=arguments.mamdani_rules,
         mamdani_universe_points=arguments.mamdani_universe_points,
+        mamdani_antecedent_curve=arguments.mamdani_antecedent_curve,
         validation_examples=arguments.validation_examples,
+        seed=arguments.seed,
     )
     if arguments.rolling_validation:
         outcome = run_rolling_validation(

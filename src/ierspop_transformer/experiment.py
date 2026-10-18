@@ -78,6 +78,7 @@ def _make_model(
         freeze_fuzzy_attention=config.freeze_fuzzy_attention,
         mamdani_rules=config.mamdani_rules,
         mamdani_universe_points=config.mamdani_universe_points,
+        mamdani_antecedent_curve=config.mamdani_antecedent_curve,
     )
 
 
@@ -398,6 +399,8 @@ def run_experiment(
             {
                 "type": "Mamdani",
                 "rules_per_hidden_feature": config.mamdani_rules,
+                "antecedent_membership_curve": config.mamdani_antecedent_curve,
+                "consequent_membership_curve": "triangular (fixed)",
                 "implication": "minimum",
                 "aggregation": "maximum",
                 "defuzzification": "centroid",
