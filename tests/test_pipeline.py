@@ -17,8 +17,10 @@ from ierspop_transformer.data import (
 from ierspop_transformer.baselines import ridge_prequential_predictions
 from ierspop_transformer.metrics import regression_metrics
 from ierspop_transformer.model import (
+    ITransformerVolatilityTransformer,
     MamdaniFuzzyLayer,
     MultiHeadSelfAttention,
+    PatchTSTVolatilityTransformer,
     VolatilityTransformer,
     membership_degree,
 )
@@ -139,6 +141,18 @@ class PipelineTests(unittest.TestCase):
                 torch.all(torch.isfinite(fuzzy_layer.antecedent_centers.grad))
             )
 
+    def test_mamdani_supports_every_consequent_curve(self) -> None:
+        for curve in ("gaussian", "triangular", "trapezoidal", "parabolic"):
+            fuzzy_layer = MamdaniFuzzyLayer(
+                d_model=1,
+                rule_count=3,
+                universe_points=51,
+                consequent_curve=curve,
+            )
+            crisp = fuzzy_layer.defuzzify(torch.tensor([[[-0.4], [0.4]]]))
+            self.assertTrue(torch.all(torch.isfinite(crisp)))
+            self.assertLess(float(crisp[0, 0, 0]), float(crisp[0, 1, 0]))
+
     def test_unknown_membership_curve_is_rejected(self) -> None:
         with self.assertRaises(ValueError):
             MamdaniFuzzyLayer(d_model=1, antecedent_curve="not-a-curve")
@@ -165,6 +179,62 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(tuple(weights.shape), (2, 2, 3, 3))
         output.sum().backward()
         self.assertIsNotNone(attention.fuzziness_param.grad)
+
+    def test_deterministic_fuzzy_attention_uses_learned_distance_widths(self) -> None:
+        attention = MultiHeadSelfAttention(
+            d_model=4,
+            nhead=2,
+            fuzzy_attention=False,
+            deterministic_fuzzy_attention=True,
+        )
+        output, weights = attention(torch.randn(2, 3, 4), return_attention=True)
+        torch.testing.assert_close(
+            weights.sum(dim=-1), torch.ones(2, 2, 3)
+        )
+        output.sum().backward()
+        self.assertIsNotNone(attention.raw_similarity_widths.grad)
+
+    def test_mamdani_can_be_placed_after_attention_or_both_sublayers(self) -> None:
+        attention_only = VolatilityTransformer(
+            sequence_length=5,
+            d_model=8,
+            nhead=2,
+            mamdani_rules=3,
+            mamdani_placement="after_attention",
+        )
+        attention_layer = attention_only.encoder.layers[0]
+        self.assertIs(attention_layer.mamdani, attention_layer.attention_mamdani)
+
+        both = VolatilityTransformer(
+            sequence_length=5,
+            d_model=8,
+            nhead=2,
+            mamdani_rules=3,
+            mamdani_placement="both",
+        )
+        both_layer = both.encoder.layers[0]
+        self.assertIsNotNone(both_layer.attention_mamdani)
+        self.assertIsNot(both_layer.mamdani, both_layer.attention_mamdani)
+
+    def test_patchtst_and_itransformer_style_models_predict(self) -> None:
+        x = torch.randn(4, 20, 1)
+        patch_model = PatchTSTVolatilityTransformer(
+            sequence_length=20,
+            patch_length=4,
+            patch_stride=2,
+            d_model=8,
+            nhead=2,
+            persistence_residual=True,
+        )
+        inverted_model = ITransformerVolatilityTransformer(
+            sequence_length=20,
+            d_model=8,
+            nhead=2,
+            persistence_residual=True,
+        )
+        torch.testing.assert_close(patch_model(x), x[:, -1, 0])
+        torch.testing.assert_close(inverted_model(x), x[:, -1, 0])
+        self.assertEqual(patch_model.patch_count, 9)
 
     def test_pure_fantf_default_has_no_mamdani_post_layer(self) -> None:
         model = VolatilityTransformer(sequence_length=5, d_model=8, nhead=2)

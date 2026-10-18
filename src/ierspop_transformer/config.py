@@ -6,6 +6,9 @@ class ExperimentConfig:
     """Small-model defaults chosen for the 860-example volatility dataset."""
 
     sequence_length: int = 5
+    architecture: str = "transformer"
+    patch_length: int = 4
+    patch_stride: int = 2
     test_start_matlab: int = 487
     d_model: int = 8
     nhead: int = 2
@@ -28,9 +31,12 @@ class ExperimentConfig:
     fuzzy_attention: bool = True
     fuzzy_attention_delta: float = 0.5
     freeze_fuzzy_attention: bool = False
+    deterministic_fuzzy_attention: bool = False
     mamdani_rules: int = 0
     mamdani_universe_points: int = 101
     mamdani_antecedent_curve: str = "gaussian"
+    mamdani_consequent_curve: str = "triangular"
+    mamdani_placement: str = "after_feedforward"
     seed: int = 42
 
     def to_dict(self) -> dict:

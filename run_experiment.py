@@ -31,6 +31,13 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--num-layers", type=int, default=1)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--sequence-length", type=int, default=5)
+    parser.add_argument(
+        "--architecture",
+        choices=("transformer", "patchtst", "itransformer"),
+        default="transformer",
+    )
+    parser.add_argument("--patch-length", type=int, default=4)
+    parser.add_argument("--patch-stride", type=int, default=2)
     parser.add_argument("--replay-window", type=int, default=120)
     parser.add_argument(
         "--persistence-residual", dest="persistence_residual", action="store_true", default=True
@@ -49,6 +56,11 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--fuzzy-attention-delta", type=float, default=0.5)
     parser.add_argument("--freeze-fuzzy-attention", action="store_true")
     parser.add_argument(
+        "--deterministic-fuzzy-attention",
+        action="store_true",
+        help="Use learned Gaussian Q/K distance memberships instead of FANTF noise",
+    )
+    parser.add_argument(
         "--mamdani-rules",
         type=int,
         default=0,
@@ -60,6 +72,16 @@ def parse_arguments() -> argparse.Namespace:
         choices=("gaussian", "triangular", "trapezoidal", "parabolic"),
         default="gaussian",
         help="Membership curve used by each Mamdani antecedent",
+    )
+    parser.add_argument(
+        "--mamdani-consequent-curve",
+        choices=("gaussian", "triangular", "trapezoidal", "parabolic"),
+        default="triangular",
+    )
+    parser.add_argument(
+        "--mamdani-placement",
+        choices=("after_attention", "after_feedforward", "both"),
+        default="after_feedforward",
     )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--validation-only", action="store_true")
@@ -81,6 +103,9 @@ if __name__ == "__main__":
         num_layers=arguments.num_layers,
         learning_rate=arguments.learning_rate,
         sequence_length=arguments.sequence_length,
+        architecture=arguments.architecture,
+        patch_length=arguments.patch_length,
+        patch_stride=arguments.patch_stride,
         replay_window=arguments.replay_window,
         persistence_residual=(
             arguments.persistence_residual or arguments.gated_residual
@@ -90,12 +115,18 @@ if __name__ == "__main__":
         fuzzy_memberships=arguments.fuzzy_memberships,
         quantile_fuzzifier=arguments.quantile_fuzzifier,
         freeze_fuzzifier=arguments.freeze_fuzzifier,
-        fuzzy_attention=arguments.fuzzy_attention,
+        fuzzy_attention=(
+            arguments.fuzzy_attention
+            and not arguments.deterministic_fuzzy_attention
+        ),
         fuzzy_attention_delta=arguments.fuzzy_attention_delta,
         freeze_fuzzy_attention=arguments.freeze_fuzzy_attention,
+        deterministic_fuzzy_attention=arguments.deterministic_fuzzy_attention,
         mamdani_rules=arguments.mamdani_rules,
         mamdani_universe_points=arguments.mamdani_universe_points,
         mamdani_antecedent_curve=arguments.mamdani_antecedent_curve,
+        mamdani_consequent_curve=arguments.mamdani_consequent_curve,
+        mamdani_placement=arguments.mamdani_placement,
         validation_examples=arguments.validation_examples,
         seed=arguments.seed,
     )

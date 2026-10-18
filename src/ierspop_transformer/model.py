@@ -85,6 +85,7 @@ class MamdaniFuzzyLayer(nn.Module):
         rule_count: int = 3,
         universe_points: int = 101,
         antecedent_curve: str = "gaussian",
+        consequent_curve: str = "triangular",
     ) -> None:
         super().__init__()
         if d_model <= 0:
@@ -97,7 +98,12 @@ class MamdaniFuzzyLayer(nn.Module):
             raise ValueError(
                 f"antecedent_curve must be one of {MEMBERSHIP_CURVES}"
             )
+        if consequent_curve not in MEMBERSHIP_CURVES:
+            raise ValueError(
+                f"consequent_curve must be one of {MEMBERSHIP_CURVES}"
+            )
         self.antecedent_curve = antecedent_curve
+        self.consequent_curve = consequent_curve
 
         rule_centers = torch.linspace(-1.0, 1.0, rule_count)
         rule_spacing = 2.0 / (rule_count - 1)
@@ -116,11 +122,10 @@ class MamdaniFuzzyLayer(nn.Module):
             1.0 + rule_spacing,
             universe_points,
         )
-        consequent_memberships = torch.clamp(
-            1.0
-            - torch.abs(output_universe.unsqueeze(0) - rule_centers.unsqueeze(1))
+        consequent_memberships = membership_degree(
+            (output_universe.unsqueeze(0) - rule_centers.unsqueeze(1))
             / rule_spacing,
-            min=0.0,
+            consequent_curve,
         )
         self.register_buffer("output_universe", output_universe)
         self.register_buffer("consequent_memberships", consequent_memberships)
@@ -172,6 +177,7 @@ class MultiHeadSelfAttention(nn.Module):
         fuzzy_attention: bool = False,
         fuzzy_attention_delta: float = 0.5,
         freeze_fuzzy_attention: bool = False,
+        deterministic_fuzzy_attention: bool = False,
     ) -> None:
         super().__init__()
         if d_model <= 0:
@@ -182,6 +188,10 @@ class MultiHeadSelfAttention(nn.Module):
             raise ValueError("dropout must be in [0, 1)")
         if fuzzy_attention_delta < 0.0:
             raise ValueError("fuzzy_attention_delta must be non-negative")
+        if fuzzy_attention and deterministic_fuzzy_attention:
+            raise ValueError(
+                "stochastic and deterministic fuzzy attention are mutually exclusive"
+            )
 
         self.d_model = d_model
         self.nhead = nhead
@@ -192,6 +202,7 @@ class MultiHeadSelfAttention(nn.Module):
         self.output_projection = nn.Linear(d_model, d_model)
         self.attention_dropout = nn.Dropout(dropout)
         self.fuzzy_attention = fuzzy_attention
+        self.deterministic_fuzzy_attention = deterministic_fuzzy_attention
         self.fuzzy_attention_delta = fuzzy_attention_delta
         if fuzzy_attention:
             self.fuzziness_param = nn.Parameter(
@@ -199,6 +210,12 @@ class MultiHeadSelfAttention(nn.Module):
             )
         else:
             self.register_parameter("fuzziness_param", None)
+        if deterministic_fuzzy_attention:
+            self.raw_similarity_widths = nn.Parameter(
+                torch.zeros(nhead), requires_grad=not freeze_fuzzy_attention
+            )
+        else:
+            self.register_parameter("raw_similarity_widths", None)
 
     def _split_heads(self, values: torch.Tensor) -> torch.Tensor:
         batch_size, sequence_length, _ = values.shape
@@ -224,14 +241,23 @@ class MultiHeadSelfAttention(nn.Module):
         keys = self._split_heads(self.key_projection(x))
         values = self._split_heads(self.value_projection(x))
 
-        scores = torch.matmul(queries, keys.transpose(-2, -1))
+        if self.deterministic_fuzzy_attention:
+            differences = queries.unsqueeze(-2) - keys.unsqueeze(-3)
+            widths = F.softplus(self.raw_similarity_widths) + 1e-4
+            scores = -0.5 * differences.square().mean(dim=-1) / widths.view(
+                1, self.nhead, 1, 1
+            ).square()
+            score_scale = 1.0
+        else:
+            scores = torch.matmul(queries, keys.transpose(-2, -1))
+            score_scale = math.sqrt(self.head_dim)
         if self.fuzzy_attention:
             scores = scores + (
                 self.fuzzy_attention_delta
                 * self.fuzziness_param
                 * torch.randn_like(scores)
             )
-        attention = F.softmax(scores / math.sqrt(self.head_dim), dim=-1)
+        attention = F.softmax(scores / score_scale, dim=-1)
         attended = torch.matmul(self.attention_dropout(attention), values)
         output = self.output_projection(self._merge_heads(attended))
         if return_attention:
@@ -270,11 +296,22 @@ class TransformerEncoderBlock(nn.Module):
         fuzzy_attention: bool = True,
         fuzzy_attention_delta: float = 0.5,
         freeze_fuzzy_attention: bool = False,
+        deterministic_fuzzy_attention: bool = False,
         mamdani_rules: int = 3,
         mamdani_universe_points: int = 101,
         mamdani_antecedent_curve: str = "gaussian",
+        mamdani_consequent_curve: str = "triangular",
+        mamdani_placement: str = "after_feedforward",
     ) -> None:
         super().__init__()
+        if mamdani_placement not in (
+            "after_attention",
+            "after_feedforward",
+            "both",
+        ):
+            raise ValueError(
+                "mamdani_placement must be after_attention, after_feedforward, or both"
+            )
         self.attention_norm = nn.LayerNorm(d_model)
         self.self_attention = MultiHeadSelfAttention(
             d_model,
@@ -283,19 +320,34 @@ class TransformerEncoderBlock(nn.Module):
             fuzzy_attention=fuzzy_attention,
             fuzzy_attention_delta=fuzzy_attention_delta,
             freeze_fuzzy_attention=freeze_fuzzy_attention,
+            deterministic_fuzzy_attention=deterministic_fuzzy_attention,
         )
         self.feedforward_norm = nn.LayerNorm(d_model)
         self.feedforward = PositionwiseFeedForward(
             d_model, dim_feedforward, dropout
         )
         self.residual_dropout = nn.Dropout(dropout)
-        self.mamdani = (
-            MamdaniFuzzyLayer(
+        def make_mamdani() -> MamdaniFuzzyLayer:
+            return MamdaniFuzzyLayer(
                 d_model=d_model,
                 rule_count=mamdani_rules,
                 universe_points=mamdani_universe_points,
                 antecedent_curve=mamdani_antecedent_curve,
+                consequent_curve=mamdani_consequent_curve,
             )
+
+        self.mamdani_placement = mamdani_placement
+        self.attention_mamdani = (
+            make_mamdani()
+            if mamdani_rules
+            and mamdani_placement in ("after_attention", "both")
+            else None
+        )
+        self.mamdani = (
+            make_mamdani()
+            if mamdani_rules
+            and mamdani_placement in ("after_feedforward", "both")
+            else self.attention_mamdani
             if mamdani_rules
             else None
         )
@@ -303,9 +355,16 @@ class TransformerEncoderBlock(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         attention_input = self.attention_norm(x)
         x = x + self.residual_dropout(self.self_attention(attention_input))
+        if self.attention_mamdani is not None:
+            x = self.attention_mamdani(x)
         feedforward_input = self.feedforward_norm(x)
         x = x + self.residual_dropout(self.feedforward(feedforward_input))
-        return self.mamdani(x) if self.mamdani is not None else x
+        if (
+            self.mamdani is not None
+            and self.mamdani_placement in ("after_feedforward", "both")
+        ):
+            x = self.mamdani(x)
+        return x
 
 
 class TransformerEncoder(nn.Module):
@@ -321,9 +380,12 @@ class TransformerEncoder(nn.Module):
         fuzzy_attention: bool = True,
         fuzzy_attention_delta: float = 0.5,
         freeze_fuzzy_attention: bool = False,
+        deterministic_fuzzy_attention: bool = False,
         mamdani_rules: int = 3,
         mamdani_universe_points: int = 101,
         mamdani_antecedent_curve: str = "gaussian",
+        mamdani_consequent_curve: str = "triangular",
+        mamdani_placement: str = "after_feedforward",
     ) -> None:
         super().__init__()
         if num_layers <= 0:
@@ -338,9 +400,12 @@ class TransformerEncoder(nn.Module):
                     fuzzy_attention=fuzzy_attention,
                     fuzzy_attention_delta=fuzzy_attention_delta,
                     freeze_fuzzy_attention=freeze_fuzzy_attention,
+                    deterministic_fuzzy_attention=deterministic_fuzzy_attention,
                     mamdani_rules=mamdani_rules,
                     mamdani_universe_points=mamdani_universe_points,
                     mamdani_antecedent_curve=mamdani_antecedent_curve,
+                    mamdani_consequent_curve=mamdani_consequent_curve,
+                    mamdani_placement=mamdani_placement,
                 )
                 for _ in range(num_layers)
             ]
@@ -378,9 +443,12 @@ class VolatilityTransformer(nn.Module):
         fuzzy_attention: bool = True,
         fuzzy_attention_delta: float = 0.5,
         freeze_fuzzy_attention: bool = False,
+        deterministic_fuzzy_attention: bool = False,
         mamdani_rules: int = 0,
         mamdani_universe_points: int = 101,
         mamdani_antecedent_curve: str = "gaussian",
+        mamdani_consequent_curve: str = "triangular",
+        mamdani_placement: str = "after_feedforward",
     ) -> None:
         super().__init__()
         if sequence_length <= 0 or input_features <= 0:
@@ -422,9 +490,12 @@ class VolatilityTransformer(nn.Module):
             fuzzy_attention=fuzzy_attention,
             fuzzy_attention_delta=fuzzy_attention_delta,
             freeze_fuzzy_attention=freeze_fuzzy_attention,
+            deterministic_fuzzy_attention=deterministic_fuzzy_attention,
             mamdani_rules=mamdani_rules,
             mamdani_universe_points=mamdani_universe_points,
             mamdani_antecedent_curve=mamdani_antecedent_curve,
+            mamdani_consequent_curve=mamdani_consequent_curve,
+            mamdani_placement=mamdani_placement,
         )
         self.output_norm = nn.LayerNorm(d_model)
         self.regression_head = nn.Linear(d_model, 1)
@@ -455,6 +526,200 @@ class VolatilityTransformer(nn.Module):
         encoded = self.encoder(encoded)
         newest = self.output_norm(encoded[:, -1, :])
         correction = self.regression_head(newest).squeeze(-1)
+        if self.persistence_residual:
+            if self.gated_residual:
+                correction = torch.sigmoid(self.residual_gate_logit) * correction
+            return x[:, -1, 0] + correction
+        return correction
+
+
+class PatchTSTVolatilityTransformer(nn.Module):
+    """PatchTST-style forecaster using the project's custom encoder blocks.
+
+    Overlapping temporal patches become tokens. With multiple input features,
+    each channel is patched independently as in channel-independent PatchTST.
+    """
+
+    def __init__(
+        self,
+        sequence_length: int,
+        patch_length: int = 4,
+        patch_stride: int = 2,
+        d_model: int = 16,
+        nhead: int = 2,
+        num_layers: int = 1,
+        dim_feedforward: int = 32,
+        dropout: float = 0.0,
+        persistence_residual: bool = False,
+        gated_residual: bool = False,
+        input_features: int = 1,
+        fuzzy_attention: bool = False,
+        fuzzy_attention_delta: float = 0.5,
+        freeze_fuzzy_attention: bool = False,
+        deterministic_fuzzy_attention: bool = False,
+        mamdani_rules: int = 0,
+        mamdani_universe_points: int = 101,
+        mamdani_antecedent_curve: str = "gaussian",
+        mamdani_consequent_curve: str = "triangular",
+        mamdani_placement: str = "after_feedforward",
+    ) -> None:
+        super().__init__()
+        if not 1 <= patch_length <= sequence_length:
+            raise ValueError("patch_length must be between one and sequence_length")
+        if patch_stride <= 0:
+            raise ValueError("patch_stride must be positive")
+        if gated_residual and not persistence_residual:
+            raise ValueError("gated_residual requires persistence_residual")
+        self.sequence_length = sequence_length
+        self.input_features = input_features
+        self.patch_length = patch_length
+        self.patch_stride = patch_stride
+        self.patch_count = 1 + (sequence_length - patch_length) // patch_stride
+        self.persistence_residual = persistence_residual
+        self.gated_residual = gated_residual
+        self.patch_projection = nn.Linear(patch_length, d_model)
+        self.position = nn.Parameter(
+            torch.zeros(1, input_features * self.patch_count, d_model)
+        )
+        self.encoder = TransformerEncoder(
+            d_model=d_model,
+            nhead=nhead,
+            num_layers=num_layers,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout,
+            fuzzy_attention=fuzzy_attention,
+            fuzzy_attention_delta=fuzzy_attention_delta,
+            freeze_fuzzy_attention=freeze_fuzzy_attention,
+            deterministic_fuzzy_attention=deterministic_fuzzy_attention,
+            mamdani_rules=mamdani_rules,
+            mamdani_universe_points=mamdani_universe_points,
+            mamdani_antecedent_curve=mamdani_antecedent_curve,
+            mamdani_consequent_curve=mamdani_consequent_curve,
+            mamdani_placement=mamdani_placement,
+        )
+        self.output_norm = nn.LayerNorm(d_model)
+        self.regression_head = nn.Linear(d_model, 1)
+        self.residual_gate_logit = (
+            nn.Parameter(torch.tensor(-2.1972246)) if gated_residual else None
+        )
+        nn.init.normal_(self.position, mean=0.0, std=0.02)
+        nn.init.xavier_uniform_(self.patch_projection.weight)
+        nn.init.zeros_(self.patch_projection.bias)
+        nn.init.xavier_uniform_(self.regression_head.weight)
+        nn.init.zeros_(self.regression_head.bias)
+        if persistence_residual:
+            nn.init.zeros_(self.regression_head.weight)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if x.ndim != 3 or x.shape[1:] != (
+            self.sequence_length,
+            self.input_features,
+        ):
+            raise ValueError(
+                f"Expected [batch, {self.sequence_length}, {self.input_features}], "
+                f"got {tuple(x.shape)}"
+            )
+        patches = x.transpose(1, 2).unfold(
+            dimension=-1, size=self.patch_length, step=self.patch_stride
+        )
+        tokens = patches.contiguous().view(
+            x.shape[0], self.input_features * self.patch_count, self.patch_length
+        )
+        encoded = self.patch_projection(tokens) + self.position
+        encoded = self.encoder(encoded)
+        target_feature_latest_patch = self.patch_count - 1
+        newest = self.output_norm(encoded[:, target_feature_latest_patch, :])
+        correction = self.regression_head(newest).squeeze(-1)
+        if self.persistence_residual:
+            if self.gated_residual:
+                correction = torch.sigmoid(self.residual_gate_logit) * correction
+            return x[:, -1, 0] + correction
+        return correction
+
+
+class ITransformerVolatilityTransformer(nn.Module):
+    """iTransformer-style forecaster with variables used as attention tokens.
+
+    For this univariate dataset there is one variable token, so the experiment
+    also measures the expected degeneration of cross-variable attention.
+    """
+
+    def __init__(
+        self,
+        sequence_length: int,
+        d_model: int = 16,
+        nhead: int = 2,
+        num_layers: int = 1,
+        dim_feedforward: int = 32,
+        dropout: float = 0.0,
+        persistence_residual: bool = False,
+        gated_residual: bool = False,
+        input_features: int = 1,
+        fuzzy_attention: bool = False,
+        fuzzy_attention_delta: float = 0.5,
+        freeze_fuzzy_attention: bool = False,
+        deterministic_fuzzy_attention: bool = False,
+        mamdani_rules: int = 0,
+        mamdani_universe_points: int = 101,
+        mamdani_antecedent_curve: str = "gaussian",
+        mamdani_consequent_curve: str = "triangular",
+        mamdani_placement: str = "after_feedforward",
+    ) -> None:
+        super().__init__()
+        if sequence_length <= 0 or input_features <= 0:
+            raise ValueError("sequence_length and input_features must be positive")
+        if gated_residual and not persistence_residual:
+            raise ValueError("gated_residual requires persistence_residual")
+        self.sequence_length = sequence_length
+        self.input_features = input_features
+        self.persistence_residual = persistence_residual
+        self.gated_residual = gated_residual
+        self.temporal_projection = nn.Linear(sequence_length, d_model)
+        self.variable_position = nn.Parameter(
+            torch.zeros(1, input_features, d_model)
+        )
+        self.encoder = TransformerEncoder(
+            d_model=d_model,
+            nhead=nhead,
+            num_layers=num_layers,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout,
+            fuzzy_attention=fuzzy_attention,
+            fuzzy_attention_delta=fuzzy_attention_delta,
+            freeze_fuzzy_attention=freeze_fuzzy_attention,
+            deterministic_fuzzy_attention=deterministic_fuzzy_attention,
+            mamdani_rules=mamdani_rules,
+            mamdani_universe_points=mamdani_universe_points,
+            mamdani_antecedent_curve=mamdani_antecedent_curve,
+            mamdani_consequent_curve=mamdani_consequent_curve,
+            mamdani_placement=mamdani_placement,
+        )
+        self.output_norm = nn.LayerNorm(d_model)
+        self.regression_head = nn.Linear(d_model, 1)
+        self.residual_gate_logit = (
+            nn.Parameter(torch.tensor(-2.1972246)) if gated_residual else None
+        )
+        nn.init.normal_(self.variable_position, mean=0.0, std=0.02)
+        nn.init.xavier_uniform_(self.temporal_projection.weight)
+        nn.init.zeros_(self.temporal_projection.bias)
+        nn.init.xavier_uniform_(self.regression_head.weight)
+        nn.init.zeros_(self.regression_head.bias)
+        if persistence_residual:
+            nn.init.zeros_(self.regression_head.weight)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if x.ndim != 3 or x.shape[1:] != (
+            self.sequence_length,
+            self.input_features,
+        ):
+            raise ValueError(
+                f"Expected [batch, {self.sequence_length}, {self.input_features}], "
+                f"got {tuple(x.shape)}"
+            )
+        tokens = self.temporal_projection(x.transpose(1, 2)) + self.variable_position
+        encoded = self.encoder(tokens)
+        target_variable = self.output_norm(encoded[:, 0, :])
+        correction = self.regression_head(target_variable).squeeze(-1)
         if self.persistence_residual:
             if self.gated_residual:
                 correction = torch.sigmoid(self.residual_gate_logit) * correction

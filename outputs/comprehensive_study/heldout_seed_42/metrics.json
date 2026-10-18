@@ -1,0 +1,91 @@
+{
+  "model": "transformer",
+  "encoder_implementation": "explicit multi-head self-attention and feed-forward blocks",
+  "fuzzy_attention": null,
+  "layer_fuzzy_inference": {
+    "type": "Mamdani",
+    "rules_per_hidden_feature": 7,
+    "antecedent_membership_curve": "parabolic",
+    "consequent_membership_curve": "triangular",
+    "placement": "after_feedforward",
+    "implication": "minimum",
+    "aggregation": "maximum",
+    "defuzzification": "centroid"
+  },
+  "replaced_matlab_component": "BCM association learner in update_ron_online_rule.m",
+  "evaluation": "chronological prequential (predict then learn)",
+  "dataset": "/Users/sam/.codex/.chatgpt-projects/g-p-6a8aedff1e2081919896094d898a5d98/ierspop/extended/data/otmVolatility.mat",
+  "total_examples": 855,
+  "warmup_examples": 481,
+  "test_examples": 374,
+  "first_test_window_matlab": 482,
+  "normalization": {
+    "mean": 22.843788146972656,
+    "std": 3.2824623584747314
+  },
+  "config": {
+    "sequence_length": 10,
+    "architecture": "transformer",
+    "patch_length": 4,
+    "patch_stride": 2,
+    "test_start_matlab": 487,
+    "d_model": 8,
+    "nhead": 2,
+    "num_layers": 1,
+    "dim_feedforward": 32,
+    "dropout": 0.0,
+    "learning_rate": 0.001,
+    "weight_decay": 1e-05,
+    "batch_size": 32,
+    "warmup_epochs": 120,
+    "online_steps": 1,
+    "replay_window": 120,
+    "validation_examples": 100,
+    "persistence_residual": true,
+    "gated_residual": false,
+    "engineered_features": false,
+    "fuzzy_memberships": 0,
+    "quantile_fuzzifier": false,
+    "freeze_fuzzifier": false,
+    "fuzzy_attention": false,
+    "fuzzy_attention_delta": 0.5,
+    "freeze_fuzzy_attention": false,
+    "deterministic_fuzzy_attention": false,
+    "mamdani_rules": 7,
+    "mamdani_universe_points": 101,
+    "mamdani_antecedent_curve": "parabolic",
+    "mamdani_consequent_curve": "triangular",
+    "mamdani_placement": "after_feedforward",
+    "seed": 42
+  },
+  "metrics": {
+    "rmse": 1.5055747544230615,
+    "mae": 1.1214237060138885,
+    "pearson_r": 0.9386227167412635,
+    "predictive_r_squared": 0.8741508846987693
+  },
+  "persistence_baseline": {
+    "rmse": 1.3727193044355621,
+    "mae": 0.9157754010695187,
+    "pearson_r": 0.947584287623831,
+    "predictive_r_squared": 0.8953813765223967
+  },
+  "validation": {
+    "examples": 100,
+    "metrics": {
+      "rmse": 1.5363842700569137,
+      "mae": 1.1081999969482421,
+      "pearson_r": 0.8810775930291651,
+      "predictive_r_squared": 0.7704673010703208
+    },
+    "persistence_baseline": {
+      "rmse": 1.6485751118138365,
+      "mae": 1.115999984741211,
+      "pearson_r": 0.8684633744477606,
+      "predictive_r_squared": 0.7357211931883667
+    }
+  },
+  "published_ierspoppp_rmse": 1.8045,
+  "warmup_final_normalized_mse": 0.12648802472127452,
+  "parameter_count": 1113
+}

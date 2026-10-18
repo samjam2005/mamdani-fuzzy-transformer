@@ -21,7 +21,11 @@ from .data import (
     matlab_test_start_to_python,
 )
 from .metrics import regression_metrics
-from .model import VolatilityTransformer
+from .model import (
+    ITransformerVolatilityTransformer,
+    PatchTSTVolatilityTransformer,
+    VolatilityTransformer,
+)
 
 
 def _set_seed(seed: int) -> None:
@@ -57,9 +61,10 @@ def _fuzzy_initialization(
 def _make_model(
     config: ExperimentConfig,
     fuzzy_initialization: tuple[torch.Tensor | None, torch.Tensor | None] = (None, None),
-) -> VolatilityTransformer:
+) -> nn.Module:
     fuzzy_centers, fuzzy_widths = fuzzy_initialization
-    return VolatilityTransformer(
+    input_features = 4 if config.engineered_features else 1
+    common_arguments = dict(
         sequence_length=config.sequence_length,
         d_model=config.d_model,
         nhead=config.nhead,
@@ -68,18 +73,38 @@ def _make_model(
         dropout=config.dropout,
         persistence_residual=config.persistence_residual,
         gated_residual=config.gated_residual,
-        input_features=4 if config.engineered_features else 1,
-        fuzzy_memberships=config.fuzzy_memberships,
-        fuzzy_centers=fuzzy_centers,
-        fuzzy_widths=fuzzy_widths,
-        freeze_fuzzifier=config.freeze_fuzzifier,
+        input_features=input_features,
         fuzzy_attention=config.fuzzy_attention,
         fuzzy_attention_delta=config.fuzzy_attention_delta,
         freeze_fuzzy_attention=config.freeze_fuzzy_attention,
+        deterministic_fuzzy_attention=config.deterministic_fuzzy_attention,
         mamdani_rules=config.mamdani_rules,
         mamdani_universe_points=config.mamdani_universe_points,
         mamdani_antecedent_curve=config.mamdani_antecedent_curve,
+        mamdani_consequent_curve=config.mamdani_consequent_curve,
+        mamdani_placement=config.mamdani_placement,
     )
+    if config.architecture == "transformer":
+        return VolatilityTransformer(
+            **common_arguments,
+            fuzzy_memberships=config.fuzzy_memberships,
+            fuzzy_centers=fuzzy_centers,
+            fuzzy_widths=fuzzy_widths,
+            freeze_fuzzifier=config.freeze_fuzzifier,
+        )
+    if config.fuzzy_memberships:
+        raise ValueError(
+            "input fuzzy memberships are currently supported only by transformer"
+        )
+    if config.architecture == "patchtst":
+        return PatchTSTVolatilityTransformer(
+            **common_arguments,
+            patch_length=config.patch_length,
+            patch_stride=config.patch_stride,
+        )
+    if config.architecture == "itransformer":
+        return ITransformerVolatilityTransformer(**common_arguments)
+    raise ValueError("architecture must be transformer, patchtst, or itransformer")
 
 
 def _test_start_for_sequence(config: ExperimentConfig) -> int:
@@ -376,23 +401,19 @@ def run_experiment(
     metrics = regression_metrics(actual, predicted)
     persistence = regression_metrics(actual, x_raw[test_start:, -1, 0])
     result = {
-        "model": (
-            "FANTFStyleMamdaniVolatilityTransformer"
-            if config.fuzzy_attention and config.mamdani_rules
-            else "FANTFStyleVolatilityTransformer"
-            if config.fuzzy_attention
-            else "MamdaniVolatilityTransformer"
-            if config.mamdani_rules
-            else "VolatilityTransformer"
-        ),
+        "model": config.architecture,
         "encoder_implementation": "explicit multi-head self-attention and feed-forward blocks",
         "fuzzy_attention": (
             {
-                "type": "FANTF-style Gaussian score perturbation",
+                "type": (
+                    "deterministic Gaussian distance attention"
+                    if config.deterministic_fuzzy_attention
+                    else "FANTF-style Gaussian score perturbation"
+                ),
                 "delta": config.fuzzy_attention_delta,
                 "learnable_fuzziness_per_encoder_layer": not config.freeze_fuzzy_attention,
             }
-            if config.fuzzy_attention
+            if config.fuzzy_attention or config.deterministic_fuzzy_attention
             else None
         ),
         "layer_fuzzy_inference": (
@@ -400,7 +421,8 @@ def run_experiment(
                 "type": "Mamdani",
                 "rules_per_hidden_feature": config.mamdani_rules,
                 "antecedent_membership_curve": config.mamdani_antecedent_curve,
-                "consequent_membership_curve": "triangular (fixed)",
+                "consequent_membership_curve": config.mamdani_consequent_curve,
+                "placement": config.mamdani_placement,
                 "implication": "minimum",
                 "aggregation": "maximum",
                 "defuzzification": "centroid",

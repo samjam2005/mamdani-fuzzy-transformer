@@ -108,17 +108,46 @@ custom Transformer baseline.
 When `--num-layers` is greater than one, each encoder layer receives a separate
 Mamdani system with independently learned antecedent parameters.
 
-The Mamdani antecedents can use `gaussian`, `triangular`, `trapezoidal`, or
-`parabolic` membership curves. For example:
+The Mamdani antecedents and consequents can independently use `gaussian`,
+`triangular`, `trapezoidal`, or `parabolic` membership curves. For example:
 
 ```bash
 /Users/sam/anaconda3/bin/python3 run_experiment.py \
-  --mamdani-rules 3 --mamdani-antecedent-curve trapezoidal
+  --mamdani-rules 3 \
+  --mamdani-antecedent-curve trapezoidal \
+  --mamdani-consequent-curve parabolic \
+  --mamdani-placement after_feedforward
 ```
 
-The consequent sets remain triangular so that a curve ablation changes only
-one part of the fuzzy system. Centers and widths stay learnable for all four
-families, and the number of trainable parameters is identical.
+Centers and widths stay learnable for all four families. Mamdani inference can
+be placed after attention, after the feed-forward sublayer, or in both places.
+The model also supports deterministic Gaussian-distance fuzzy attention via
+`--deterministic-fuzzy-attention`.
+
+Three custom forecasting backbones are available through `--architecture`:
+`transformer`, `patchtst`, and `itransformer`. The PatchTST-style and
+iTransformer-style variants reuse the manually implemented encoder internals;
+they do not call PyTorch's prebuilt Transformer modules.
+
+## Comprehensive architecture study
+
+`run_comprehensive_study.py` evaluates the full combination suite: 72 declared
+cases covering 64 unique configurations across membership curves, Mamdani
+placements, attention mechanisms, rule counts, depths, windows, FANTF noise
+levels, and three Transformer families. It performs a broad screen, confirms
+the finalists with more folds and seeds, and tests only the locked winner on
+the held-out period:
+
+```bash
+/Users/sam/anaconda3/bin/python3 run_comprehensive_study.py
+```
+
+The full interpretation is in
+[`COMPREHENSIVE_STUDY_REPORT.md`](COMPREHENSIVE_STUDY_REPORT.md), with a
+presentation-ready PDF at
+[`output/pdf/comprehensive_fuzzy_transformer_study.pdf`](output/pdf/comprehensive_fuzzy_transformer_study.pdf).
+The complete screening, confirmation, and held-out tables are written to
+`outputs/comprehensive_study/`.
 
 ## Transformer and curve ablation study
 
