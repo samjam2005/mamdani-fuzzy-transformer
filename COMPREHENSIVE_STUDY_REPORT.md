@@ -2,16 +2,15 @@
 
 ## Executive summary
 
-This study tests whether a compact, manually implemented Transformer can replace
-the BCM association-learning path in the supplied ieRSPOP volatility workflow,
-and whether Mamdani fuzzification or FANTF-style fuzzy attention improves that
-Transformer.
+The original ieRSPOP workflow uses BCM to learn an association. In this project,
+we replace that BCM learning step with a small Transformer whose internal parts
+we wrote ourselves. We then test whether Mamdani fuzzy rules or FANTF-style
+fuzzy attention improve its prediction of the next volatility value.
 
-The study evaluated 72 declared cases representing 64 unique configurations.
-It varied the Transformer family, self-attention mechanism, Mamdani membership
-curves, Mamdani placement, fuzzy rule count, encoder depth, input-window length,
-and FANTF noise strength. Model selection used chronological pre-test validation;
-the held-out test period was opened only after the winner was fixed.
+We planned 72 cases, representing 64 different models. We changed the model
+family, attention type, fuzzy curves, fuzzy position, number of rules, number of
+layers, number of past values, and FANTF noise strength. We chose the winner
+using earlier time-based data. We used the final test only after choosing it.
 
 The selected model was:
 
@@ -26,37 +25,40 @@ The selected model was:
   -> persistence-residual forecast
 ```
 
-It contains 1,113 trainable parameters. Across the three confirmation seeds and
-three chronological folds, it achieved RMSE `1.6512 +/- 0.0775`. Across three
-held-out test seeds, it achieved RMSE `1.4436 +/- 0.0450`, MAE
-`1.0811 +/- 0.0376`, Pearson correlation `0.9431 +/- 0.0032`, and predictive
-R-squared `0.8842 +/- 0.0073`.
+It contains 1,113 numbers that training can change. In the stronger recheck, its
+RMSE was `1.6512 +/- 0.0775`. On the final test, its average scores across three
+runs were RMSE `1.4436`, MAE `1.0811`, correlation `0.9431`, and R-squared
+`0.8842`. For RMSE and MAE, lower is better. For correlation and R-squared,
+higher is better.
 
-The result is promising but must be reported honestly: persistence remained
-better, with held-out RMSE `1.3727`. The selected model was therefore 5.17%
-worse than persistence. It was 32.60% better than the reproduced BCM artifact,
-but slightly worse than the archived single-seed API Transformer and FANTF runs.
-Those last comparisons are descriptive rather than statistically like-for-like,
-because the new result is a three-seed mean while the archived results each use
-one seed.
+The result is useful, but we must explain it honestly. The winning Transformer
+was 32.60% better than our reproduced BCM result. However, persistence - simply
+copying the latest value - had RMSE `1.3727` and was 5.17% better than our model.
+The saved API Transformer and FANTF results were also slightly better, but each
+came from only one run, while our new result is an average of three runs.
+
+**Direct answer:** the best tested Transformer was the standard-attention
+Mamdani model with one layer, 10 past values, and seven parabolic-to-triangular
+rules. The best forecast overall was persistence because it had the lowest RMSE.
 
 ## Research questions
 
 The experiment addresses five questions:
 
-1. Which Mamdani antecedent and consequent curve combination works best?
-2. Where should Mamdani inference be placed in an encoder layer?
-3. Does FANTF noise or deterministic Gaussian fuzzy attention improve standard
-   self-attention?
-4. Do deeper encoders, longer windows, or more fuzzy rules help?
-5. Does the standard custom Transformer outperform PatchTST-style and
-   iTransformer-style alternatives on this small univariate dataset?
+1. Which fuzzy input and output curve pair gives the lowest error?
+2. Should the fuzzy step come after attention, after feed-forward processing,
+   or in both places?
+3. Does FANTF random fuzziness or distance-based fuzzy attention beat normal
+   attention?
+4. Do more layers, more past values, or more fuzzy rules help?
+5. How do our Transformer, PatchTST-style, and iTransformer-style models compare
+   on this one-variable dataset?
 
 ## What is implemented from scratch
 
-The project uses PyTorch for tensors, automatic differentiation, optimizers,
-and primitive layers such as linear projections and normalization. It does not
-use `nn.MultiheadAttention`, `nn.TransformerEncoderLayer`, or
+We use PyTorch for number storage, gradient calculation, training, and basic
+parts such as linear layers and normalization. We do not use PyTorch's ready-made
+`nn.MultiheadAttention`, `nn.TransformerEncoderLayer`, or
 `nn.TransformerEncoder`.
 
 The repository directly implements:
@@ -73,15 +75,16 @@ The repository directly implements:
 - PatchTST-style patch tokenization; and
 - iTransformer-style variable tokenization.
 
-This is therefore a custom architecture implemented with PyTorch primitives,
-not a prebuilt Transformer API.
+This means the Transformer architecture is ours. PyTorch provides the basic
+math tools, but not a prebuilt Transformer.
 
 ## Mamdani design
 
-For each hidden feature, the Mamdani layer computes fuzzy membership strengths,
-applies matching low-to-low, middle-to-middle, and high-to-high rules, aggregates
-the clipped output sets, and uses a centroid to produce a crisp value. A learned
-gate adds this fuzzy result back as a residual update.
+The Mamdani layer takes each hidden number and asks how strongly it belongs to
+fuzzy groups such as low, medium, and high. It applies rules to those groups,
+combines the answers, and turns them back into one normal number using the center
+of the output shape. A learned gate controls how much that fuzzy answer changes
+the original hidden value.
 
 The experiment supports four curve families on both sides of the rule system:
 
@@ -90,16 +93,16 @@ The experiment supports four curve families on both sides of the rule system:
 - trapezoidal; and
 - parabolic.
 
-All 16 antecedent/consequent pairings were screened. Mamdani inference can be
-applied after attention, after the feed-forward network, or in both positions.
+We tested all 16 possible input/output curve pairs. The fuzzy step can be placed
+after attention, after the feed-forward network, or in both places.
 
-## Compared architectures
+## Models we built
 
 ### Standard custom Transformer
 
-Time steps are tokens. Each token is projected into the hidden dimension,
-combined with a learned temporal position, processed by the custom encoder, and
-pooled for the forecast.
+Each past time point becomes one token. The model adds information about where
+that point occurs in the sequence, processes all tokens, and combines them to
+make the next prediction.
 
 ### FANTF-style Transformer
 
@@ -109,38 +112,37 @@ The attention logits receive a learned Gaussian perturbation before softmax:
 score(i,j) = Q_i K_j / sqrt(d_head) + delta * alpha * Normal(0,1)
 ```
 
-This tests whether controlled stochastic fuzziness improves robustness.
+This checks whether a small amount of controlled random fuzziness helps.
 
 ### Deterministic fuzzy attention
 
-Each attention head learns a Gaussian width and transforms query-key distance
-into a deterministic fuzzy similarity. This separates fuzzy similarity from the
-random perturbation used by FANTF.
+Each attention head learns how far apart its query and key can be while still
+counting as similar. Unlike FANTF, this fuzzy score does not use randomness.
 
 ### PatchTST-style model
 
-The input history is divided into overlapping patches. Patch embeddings become
-tokens for the same custom encoder backbone.
+The model groups nearby values into small overlapping chunks called patches.
+Each patch becomes a token for our custom encoder.
 
 ### iTransformer-style model
 
-Variables are treated as tokens and the observation history becomes each
-token's feature vector. Since the dataset is univariate, this model has only one
-variable token; that substantially limits the cross-variable attention that
-motivates iTransformer.
+Each variable becomes a token and its past values become the token's information.
+Our dataset has only one variable, so the model gets only one variable token.
+It therefore cannot compare several variables, which is normally its main use.
 
-## Experimental protocol
+## How we kept the comparison fair
 
-The study preserves the chronological nature of the forecasting problem.
+The order of time is preserved: training always uses earlier information to
+predict later information.
 
 | Stage | Purpose | Configuration |
 |---|---|---|
-| Screening | Broad comparison | 72 declared cases, 64 unique configurations, 60 epochs, 2 folds, seeds 42 and 52 |
-| Confirmation | Re-evaluate finalists | 9 configurations, 120 epochs, 3 folds, seeds 42, 52, and 62 |
-| Held-out test | Final unbiased estimate | One locked winner, seeds 42, 52, and 62 |
+| Quick search | Broad comparison | 72 planned cases, 64 unique models, 60 training rounds, 2 time splits, seeds 42 and 52 |
+| Stronger recheck | Re-test finalists | 9 models, 120 training rounds, 3 time splits, seeds 42, 52, and 62 |
+| Final untouched test | Final result | One locked winner, seeds 42, 52, and 62 |
 
-Predictions are always made before the current target is used for online
-learning. The held-out period does not participate in architecture selection.
+The model always predicts first and sees the correct answer afterward. The final
+test data is not used to choose the model.
 
 The screening matrix includes:
 
@@ -154,32 +156,31 @@ The screening matrix includes:
 - standard, FANTF, and deterministic fuzzy attention; and
 - standard Transformer, PatchTST-style, and iTransformer-style backbones.
 
-Some declared cases intentionally overlap, so the runner caches duplicate
-configurations rather than retraining them.
+Some planned cases are the same model. The program recognizes these duplicates
+and reuses their result instead of training the same model twice.
 
-## Screening findings
+## Quick-search findings
 
-The broad screen suggests the following tendencies. These are screening results,
-not final held-out claims.
+The quick search showed the following patterns. These numbers help choose
+finalists; they are not final test results.
 
 | Factor | Best screened option | Mean RMSE | Interpretation |
 |---|---:|---:|---|
-| Attention type | FANTF stochastic | 1.6126 | Small edge in the short attention-only screen |
-| FANTF delta | 0.1 | 1.6141 | Weak noise worked better than stronger noise |
-| Mamdani placement | After feed-forward | 1.6225 | Double placement added complexity without gain |
-| Encoder depth | 1 layer | 1.6225 | Deeper models overfit this small dataset |
-| Input window | 10 | 1.5904 | More history was not automatically better |
-| Curve pair | Parabolic to Gaussian | 1.6099 | Best in the isolated 16-pair curve screen |
-| Backbone | iTransformer-style | 1.6507 | Screening winner, but did not survive confirmation |
+| Attention type | FANTF random fuzzy | 1.6126 | Small lead in this quick attention test |
+| FANTF noise | 0.1 | 1.6141 | Small noise worked better than strong noise |
+| Mamdani position | After feed-forward | 1.6225 | Using Mamdani twice added complexity without a gain |
+| Number of layers | 1 layer | 1.6225 | Deeper models worked worse on this small dataset |
+| Past values used | 10 | 1.5904 | Giving more history did not automatically help |
+| Curve pair | Parabolic to Gaussian | 1.6099 | Best only in the quick 16-pair curve test |
+| Model family | iTransformer-style | 1.6507 | Quick winner, but last in the stronger recheck |
 
-The apparent differences were generally small. In particular, the final winner
-did not use the isolated screen's best curve pair or backbone. This is why the
-confirmation stage is essential.
+Most differences were small. The quick curve and model-family winners did not
+become the final winner. This shows why we needed the stronger recheck.
 
-## Confirmation results
+## Stronger recheck of the finalists
 
-Nine finalists were retrained under the stronger three-fold, three-seed
-protocol.
+We trained nine finalists again for longer, using three time splits and three
+random starting points. Lower RMSE is better.
 
 | Rank | Configuration | RMSE mean | RMSE SD |
 |---:|---|---:|---:|
@@ -193,15 +194,15 @@ protocol.
 | 8 | FANTF only, delta 0.5, window 5 | 1.6799 | 0.0641 |
 | 9 | iTransformer-style, window 20 | 1.7237 | 0.0758 |
 
-The winner's advantage over the runner-up was only 0.16%, and their variation
-overlaps. The correct interpretation is that the seven-rule Mamdani model edged
-the tested set, not that it proved a universally superior architecture. The
-winner was also 1.46% worse than persistence on the same confirmation folds.
+The winner beat second place by only 0.16%, and the run-to-run ranges overlap.
+We can say the seven-rule Mamdani model had the best average result, but we
+cannot claim it is always better. It was also 1.46% worse than persistence on
+the same validation data.
 
-## Held-out test results
+## Final untouched test results
 
-The winning architecture was then frozen and run on the held-out period with
-three seeds.
+After choosing the winner, we stopped changing its design and ran it on the
+final untouched test with three random starting points.
 
 | Seed | RMSE | MAE | Pearson r | Predictive R-squared |
 |---:|---:|---:|---:|---:|
@@ -211,9 +212,9 @@ three seeds.
 | **Mean** | **1.4436** | **1.0811** | **0.9431** | **0.8842** |
 | **SD** | **0.0450** | **0.0376** | **0.0032** | **0.0073** |
 
-The model tracks direction and overall level well, as shown by the high
-correlation and predictive R-squared. However, the persistence baseline has
-RMSE `1.3727`, so the selected model does not yet beat the simplest forecast.
+The high correlation and R-squared mean the model follows the general movement
+well. However, persistence has a lower RMSE of `1.3727`, so the selected model
+does not yet beat the simplest forecast.
 
 ## Historical context
 
@@ -225,30 +226,27 @@ RMSE `1.3727`, so the selected model does not yet beat the simplest forecast.
 | Selected Mamdani Transformer, three-seed mean | 1.4436 | Current result |
 | Persistence | 1.3727 | Selected mean is 5.17% higher |
 
-The repository also records a separate published/reference ieRSPOP++ RMSE of
-`1.8045`. It must not be substituted for the locally reproduced BCM artifact of
-`2.1420`.
+The project also stores a separate published/reference ieRSPOP++ RMSE of
+`1.8045`. That is not the same experiment as our reproduced BCM RMSE of `2.1420`,
+so the two numbers should not be swapped.
 
 ## Interpretation
 
 The study supports four main conclusions:
 
-1. A fully inspectable custom Transformer with Mamdani inference is technically
-   viable and trains end to end.
-2. The best tested design is small: one encoder layer, a ten-step window, and
-   seven Mamdani rules. Extra depth and long windows hurt rather than help.
-3. FANTF-style fuzziness is competitive but not decisively superior. Low noise
-   is better than high noise, and the confirmed low-noise hybrid is extremely
-   close to the winner.
-4. Beating BCM is not enough. Persistence is the stronger practical baseline on
-   this smooth univariate series, and the selected model does not beat it.
+1. Our custom Transformer and Mamdani fuzzy layer train successfully together.
+2. The best tested Transformer is small: one layer, 10 past values, and seven
+   Mamdani rules. More layers and much longer histories worked worse.
+3. FANTF is competitive but did not clearly win. Small noise worked better than
+   large noise, and the low-noise version came very close to the winner.
+4. Beating BCM is not enough. Persistence was still the best forecast overall.
 
-The likely explanation is data scale. A small, smooth, univariate series gives
-attention little extra structure to exploit, while persistence has no
-estimation variance. Patch and inverted-variable designs are more useful when
-long histories or multiple variables are available.
+The likely reason is the data. It is small, has only one variable, and usually
+changes smoothly. Persistence can exploit that by copying the latest value and
+has nothing to train. Patch and iTransformer-style models usually have more to
+learn from when the history is longer or several variables are available.
 
-## Limitations
+## Limitations and what they mean
 
 - The dataset is small and univariate.
 - Screening uses fewer epochs, folds, and seeds than confirmation.
@@ -262,24 +260,31 @@ long histories or multiple variables are available.
 
 ## Recommended next experiment
 
-Freeze the selected architecture and rerun persistence, the plain Transformer,
-FANTF-only, and the selected Mamdani Transformer under exactly the same seeds,
-folds, epochs, and held-out period. If more variables are available, add volume,
-returns, or implied-volatility features before increasing architecture size.
-Report paired per-seed differences and confidence intervals.
+Keep the winning architecture fixed. Rerun persistence, the plain Transformer,
+FANTF-only, and the selected Mamdani Transformer with exactly the same random
+seeds, time splits, training rounds, and final test. If possible, add useful
+variables such as volume, returns, or implied-volatility features before making
+the model larger. Compare matching runs and report how much the results vary.
 
-## Professor-ready explanation
+## Conclusion and professor-ready explanation
 
-> We built the Transformer internals ourselves using basic PyTorch operations,
-> then inserted a trainable Mamdani fuzzy system into every encoder layer. We
-> tested 72 declared cases across membership curves, fuzzy placements, attention
-> types, depths, windows, rule counts, and three Transformer families. Selection
-> used only chronological validation data. The winning model was a one-layer
-> standard-attention Transformer with a ten-step input and seven parabolic-to-
-> triangular Mamdani rules. Its three-seed held-out RMSE was 1.4436, which is
-> much better than our reproduced BCM result, but persistence was still better
-> at 1.3727. So the main contribution is an interpretable and reproducible fuzzy
-> Transformer comparison, not a claim that it beats every baseline.
+**Best tested Transformer:** the standard-attention Mamdani Transformer with one
+layer, 10 past values, seven rules, parabolic input curves, and triangular output
+curves. Its final-test RMSE was `1.4436`.
+
+**Best result overall:** persistence, which simply copies the latest value. Its
+RMSE was lower at `1.3727`, and lower RMSE is better.
+
+> We built the Transformer parts ourselves using basic PyTorch tools and added a
+> Mamdani fuzzy system inside the encoder. We tested 72 planned cases covering
+> curves, rules, fuzzy position, attention, layers, history length, and three
+> Transformer styles. We chose the model using earlier time-based data and used
+> the final test only after choosing it. The best Transformer was the normal-
+> attention Mamdani model with one layer, 10 past values, and seven parabolic-to-
+> triangular rules. Its RMSE was 1.4436, much better than our reproduced BCM
+> result. However, persistence was best overall at 1.3727. Therefore, the fuzzy
+> Transformer is a useful BCM replacement, but it is not yet the most accurate
+> forecast for this small dataset.
 
 ## Reproduction
 

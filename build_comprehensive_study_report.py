@@ -105,7 +105,7 @@ def make_charts(screening: list[dict], confirmation: list[dict], summary: dict) 
         for column_index in range(matrix.shape[1]):
             axis.text(column_index, row_index, f"{matrix[row_index, column_index]:.3f}",
                       ha="center", va="center", fontsize=8.5)
-    axis.set_title("Core 36-case factorial: screening RMSE", fontsize=12, weight="bold")
+    axis.set_title("Main 36 combinations: quick-test RMSE", fontsize=12, weight="bold")
     figure.colorbar(image, ax=axis, label="RMSE (lower is better)", shrink=0.85)
     figure.savefig(path, dpi=190, facecolor="white")
     plt.close(figure)
@@ -127,25 +127,25 @@ def make_charts(screening: list[dict], confirmation: list[dict], summary: dict) 
     image = axis.imshow(matrix, cmap="PuBuGn_r", aspect="auto")
     axis.set_xticks(range(4), [name.capitalize() for name in curve_names], rotation=18, ha="right")
     axis.set_yticks(range(4), [name.capitalize() for name in curve_names])
-    axis.set_xlabel("Consequent curve")
-    axis.set_ylabel("Antecedent curve")
+    axis.set_xlabel("Output curve")
+    axis.set_ylabel("Input curve")
     for row_index in range(4):
         for column_index in range(4):
             axis.text(column_index, row_index, f"{matrix[row_index, column_index]:.3f}",
                       ha="center", va="center", fontsize=9)
-    axis.set_title("All 16 antecedent/consequent curve pairs", fontsize=12, weight="bold")
-    figure.colorbar(image, ax=axis, label="Screening RMSE", shrink=0.86)
+    axis.set_title("All 16 fuzzy input/output curve pairs", fontsize=12, weight="bold")
+    figure.colorbar(image, ax=axis, label="Quick-test RMSE", shrink=0.86)
     figure.savefig(path, dpi=190, facecolor="white")
     plt.close(figure)
     chart_paths["curves"] = path
 
     group_specs = [
-        ("fuzzy_placement", "Fuzzy placement", ["after_attention", "after_feedforward", "both"]),
-        ("fantf_delta", "FANTF delta", ["delta 0.1", "delta 0.25", "delta 0.5", "delta 1"]),
+        ("fuzzy_placement", "Fuzzy position", ["after_attention", "after_feedforward", "both"]),
+        ("fantf_delta", "FANTF noise", ["delta 0.1", "delta 0.25", "delta 0.5", "delta 1"]),
         ("attention_type", "Attention", ["standard", "FANTF stochastic", "deterministic Gaussian fuzzy"]),
-        ("backbone", "Backbone", ["transformer", "patchtst", "itransformer"]),
-        ("encoder_depth", "Encoder depth", ["1 encoder layer(s)", "2 encoder layer(s)", "3 encoder layer(s)"]),
-        ("sequence_length", "Input window", ["window 5", "window 10", "window 20", "window 30"]),
+        ("backbone", "Model family", ["transformer", "patchtst", "itransformer"]),
+        ("encoder_depth", "Number of layers", ["1 encoder layer(s)", "2 encoder layer(s)", "3 encoder layer(s)"]),
+        ("sequence_length", "Past values used", ["window 5", "window 10", "window 20", "window 30"]),
     ]
     path = TMP / "component_sweeps.png"
     figure, axes = plt.subplots(2, 3, figsize=(10.2, 6.2), constrained_layout=True)
@@ -163,7 +163,7 @@ def make_charts(screening: list[dict], confirmation: list[dict], summary: dict) 
         axis.grid(axis="x", alpha=0.2)
         axis.spines[["top", "right"]].set_visible(False)
         axis.tick_params(axis="x", labelsize=8)
-    figure.suptitle("One-factor screening sweeps", fontsize=13, weight="bold")
+    figure.suptitle("Quick test of one choice at a time", fontsize=13, weight="bold")
     figure.savefig(path, dpi=190, facecolor="white")
     plt.close(figure)
     chart_paths["sweeps"] = path
@@ -195,8 +195,8 @@ def make_charts(screening: list[dict], confirmation: list[dict], summary: dict) 
     axis.axvline(persistence, color="#555555", linestyle="--", label=f"Persistence {persistence:.3f}")
     axis.set_yticks(range(len(order)), [compact_labels[index] for index in order], fontsize=8.5)
     axis.invert_yaxis()
-    axis.set_xlabel("Confirmation RMSE (mean +/- SD)")
-    axis.set_title("Nine fully confirmed candidates", fontsize=12, weight="bold")
+    axis.set_xlabel("Stronger-recheck RMSE (average +/- run-to-run change)")
+    axis.set_title("Nine finalists in the stronger recheck", fontsize=12, weight="bold")
     axis.grid(axis="x", alpha=0.2)
     axis.legend(frameon=False)
     figure.savefig(path, dpi=190, facecolor="white")
@@ -227,8 +227,8 @@ def make_charts(screening: list[dict], confirmation: list[dict], summary: dict) 
         width=0.68,
     )
     axis.set_xticks(range(len(names)), names, fontsize=9)
-    axis.set_ylabel("Held-out RMSE")
-    axis.set_title("Held-out context: selected model versus recorded baselines", fontsize=12, weight="bold")
+    axis.set_ylabel("Final-test RMSE")
+    axis.set_title("Final test: selected model versus saved comparisons", fontsize=12, weight="bold")
     axis.grid(axis="y", alpha=0.2)
     axis.spines[["top", "right"]].set_visible(False)
     axis.set_ylim(0, max(values) * 1.18)
@@ -256,7 +256,7 @@ def make_charts(screening: list[dict], confirmation: list[dict], summary: dict) 
         samples[shown], ensemble[shown] - spread[shown], ensemble[shown] + spread[shown],
         color="#2A8A78", alpha=0.18, label="+/- 1 seed SD",
     )
-    axis.set(title="First 130 held-out forecasts from the selected model",
+    axis.set(title="First 130 final-test predictions from the selected model",
              xlabel="MATLAB sample", ylabel="Volatility")
     axis.grid(alpha=0.2)
     axis.spines[["top", "right"]].set_visible(False)
@@ -479,62 +479,62 @@ def build_report() -> Path:
     story.append(Spacer(1, 8 * mm))
     story.append(P("Comprehensive Fuzzy Transformer Study", styles["title"]))
     story.append(P(
-        "A controlled comparison of membership curves, Mamdani rule systems, fuzzy placement, "
-        "attention mechanisms, encoder depth, input windows, and time-series Transformer backbones",
+        "A plain-language comparison of fuzzy curves, Mamdani rules, attention types, model sizes, "
+        "input lengths, and three Transformer designs",
         styles["subtitle"],
     ))
     story.append(make_table(
         [
-            ["Study scale", "Confirmed winner", "Held-out RMSE", "Main caution"],
-            ["72 declared cases<br/>64 unique models", "W10, 1 layer, 7 rules<br/>parabolic -> triangular",
+            ["What we tested", "Best tested Transformer", "Final-test RMSE", "Important result"],
+            ["72 declared cases<br/>64 unique models", "10 past values, 1 layer, 7 rules<br/>parabolic -> triangular",
              f"<b>{heldout['rmse']['mean']:.4f} +/- {heldout['rmse']['std']:.4f}</b>",
-             f"Persistence is better<br/>({persistence_test:.4f})"],
+             f"Simple persistence is better<br/>({persistence_test:.4f})"],
         ],
         [42 * mm, 48 * mm, 39 * mm, 43 * mm], styles, highlight_rows=[1], font_size=8.1,
     ))
     story.append(Spacer(1, 6 * mm))
     story.append(P("Executive verdict", styles["h1"]))
     story.append(P(
-        "The broad experiment selected a <b>standard custom Transformer with one encoder layer, "
-        "a 10-observation input window, and a seven-rule Mamdani layer</b>. The Mamdani antecedents "
-        "are parabolic, the consequents are triangular, and fuzzy inference is applied after the "
-        "feed-forward sublayer. Its confirmed validation RMSE is "
+        "Among the Transformer models we tested, the winner was a <b>standard-attention custom "
+        "Transformer with one encoder layer, 10 past values, and seven Mamdani rules</b>. It uses "
+        "parabolic input curves and triangular output curves. The fuzzy step comes after the "
+        "feed-forward step. On the stronger validation test, its RMSE was "
         f"<b>{float(winner_validation['rmse_mean']):.4f} +/- {float(winner_validation['rmse_std']):.4f}</b>. "
-        "It narrowly leads the nine confirmed candidates, but its uncertainty overlaps with them.",
+        "Lower RMSE is better. It came first, but only by a small amount.",
         styles["body"],
     ))
     story.append(P(
-        f"On the 374-example held-out test, the three-seed mean RMSE is <b>{heldout['rmse']['mean']:.4f}</b>. "
-        f"This is {abs(pct_lower(heldout['rmse']['mean'], persistence_test)):.2f}% worse than persistence, "
-        f"{abs(pct_lower(heldout['rmse']['mean'], api['metrics']['rmse'])):.2f}% worse than the archived API "
-        f"Transformer run, and {abs(pct_lower(heldout['rmse']['mean'], fantf['metrics']['rmse'])):.2f}% worse "
-        f"than the archived single-seed FANTF run. It is {pct_lower(heldout['rmse']['mean'], bcm['rmse']):.2f}% "
-        "better than the reproduced BCM artifact. Historical single-seed results are context, not a "
-        "statistical comparison with the three-seed selected model.",
+        f"On the final 374-example test, its average RMSE across three runs was "
+        f"<b>{heldout['rmse']['mean']:.4f}</b>. It was {pct_lower(heldout['rmse']['mean'], bcm['rmse']):.2f}% "
+        f"better than our reproduced BCM result. However, it was {abs(pct_lower(heldout['rmse']['mean'], persistence_test)):.2f}% "
+        f"worse than simply copying the latest value, {abs(pct_lower(heldout['rmse']['mean'], api['metrics']['rmse'])):.2f}% "
+        f"worse than the saved API Transformer run, and {abs(pct_lower(heldout['rmse']['mean'], fantf['metrics']['rmse'])):.2f}% "
+        "worse than the saved FANTF run. The API and FANTF numbers each come from only one run, so they are "
+        "useful background information, not a perfectly fair statistical comparison.",
         styles["body"],
     ))
     story.append(P(
-        "Supported conclusion: the comprehensive search identifies a sensible fuzzy Transformer "
-        "candidate and shows which design choices generalize across validation folds. It does not show "
-        "that extra fuzzy machinery automatically beats simple forecasting baselines.",
+        "The short answer: the standard-attention Mamdani Transformer was the best Transformer we tested. "
+        "Persistence - copying the latest value - was still the best forecast overall. Fuzzy layers can work, "
+        "but adding more fuzzy machinery does not automatically improve accuracy.",
         styles["callout"],
     ))
     story.append(PageBreak())
 
     story.append(P("1. Research question and evaluation target", styles["h1"]))
     story.append(P(
-        "The project replaces the BCM association-learning path in the supplied ieRSPOP workflow with "
-        "an explicit Transformer forecast model. The target is next-step volatility: the model receives "
-        "a chronological window of already observed volatility values and predicts the next value.",
+        "The original ieRSPOP workflow uses BCM to learn an association. We replace that BCM learning step "
+        "with a Transformer that we can inspect and change ourselves. The task is simple: give the model a "
+        "short list of past volatility values and ask it to predict the next value.",
         styles["body"],
     ))
     story.append(P("Questions answered", styles["h2"]))
     questions = [
-        "Which antecedent and consequent membership-curve pair works best?",
-        "How many Mamdani rules, encoder layers, and past observations are useful?",
-        "Should Mamdani inference follow attention, the feed-forward block, or both?",
-        "Does FANTF noise or deterministic Gaussian-distance attention improve standard attention?",
-        "How do lightweight PatchTST-style and iTransformer-style backbones behave on this small univariate series?",
+        "Which pair of fuzzy input and output curves gives the lowest error?",
+        "How many Mamdani rules, Transformer layers, and past values should we use?",
+        "Should the fuzzy step come after attention, after feed-forward processing, or in both places?",
+        "Does FANTF random fuzziness or distance-based fuzzy attention beat normal attention?",
+        "How do Transformer, PatchTST-style, and iTransformer-style models compare on this one-variable dataset?",
     ]
     story.append(make_table([["#", "Research question"]] + [[index + 1, text] for index, text in enumerate(questions)],
                             [12 * mm, 160 * mm], styles, font_size=8.2))
@@ -543,111 +543,122 @@ def build_report() -> Path:
     story.append(make_table(
         [
             ["Item", "Setting"],
-            ["Available windows", "860 next-step examples"],
-            ["Held-out test", "374 examples; first recorded MATLAB window 487"],
-            ["Prediction order", "Predict first, reveal target, then update from replay window"],
-            ["Normalization", "Fit using observations available before the scored target"],
-            ["Primary metric", "RMSE; MAE, Pearson r, and predictive R-squared also reported"],
-            ["Simple baseline", "Persistence: predict the most recent observed value"],
+            ["Examples available", "860 examples for predicting the next value"],
+            ["Final untouched test", "374 examples; starts at recorded MATLAB window 487"],
+            ["Order", "Predict first, show the correct answer, then let the model learn"],
+            ["Scaling", "Uses only information that was already available at prediction time"],
+            ["Scores", "RMSE and MAE: lower is better. Correlation and R-squared: higher is better"],
+            ["Simple comparison", "Persistence: copy the latest observed value as the next prediction"],
         ], [43 * mm, 129 * mm], styles, font_size=8,
     ))
     story.append(Spacer(1, 5 * mm))
     story.append(protocol_diagram())
     story.append(P(
-        "This staged design limits test-set leakage. Screening is intentionally broad and cheaper; "
-        "confirmation is stronger; only the selected confirmation winner reaches the held-out test.",
+        "We choose the model before looking at the final test. First we do a quick wide search, then a "
+        "stronger recheck of the finalists, and only then do we test the single winner. This keeps the final "
+        "result fair.",
         styles["caption"],
     ))
     story.append(PageBreak())
 
-    story.append(P("2. Implemented architectures", styles["h1"]))
+    story.append(P("2. Models we built", styles["h1"]))
     story.append(P("Selected model", styles["h2"]))
     story.append(architecture_diagram())
     story.append(P(
-        "Every Transformer component remains explicit: Q/K/V projections, head splitting, scaled "
-        "dot-product attention, softmax, residual paths, layer normalization, and the position-wise "
-        "feed-forward network. No prebuilt PyTorch Transformer encoder or multi-head attention module is used.",
+        "We wrote the Transformer parts ourselves using basic PyTorch building blocks. This includes the "
+        "query, key, and value (Q/K/V) calculations, splitting into attention heads, attention scoring, "
+        "softmax, skip connections, normalization, and the feed-forward network. We did not call PyTorch's "
+        "ready-made Transformer or multi-head-attention modules.",
         styles["body"],
     ))
     architecture_rows = [
-        ["Variant", "Tokenization / attention", "Purpose in this study"],
-        ["Custom Transformer", "One time point per token; standard dot-product attention", "Capacity-controlled base encoder"],
-        ["FANTF-style", "Learned Gaussian perturbation added to attention scores", "Test stochastic fuzzy attention and delta"],
-        ["Deterministic fuzzy", "Gaussian membership from learned Q/K distance widths", "Test fuzziness without random score noise"],
-        ["PatchTST-style", "Overlapping length-4 patches, stride 2, channel independent", "Test patch tokens at a 20-step window"],
-        ["iTransformer-style", "Variables become tokens; temporal history is projected", "Test inverted tokenization; one token in univariate data"],
+        ["Version", "What it does", "Why we tested it"],
+        ["Custom Transformer", "Treats each time point as one token and uses normal attention", "Main reference model"],
+        ["FANTF-style", "Adds controlled random fuzzy noise to attention scores", "Checks whether random fuzziness helps"],
+        ["Deterministic fuzzy", "Uses query-key distance to make a fuzzy similarity score", "Checks fuzziness without randomness"],
+        ["PatchTST-style", "Groups nearby values into overlapping patches", "Checks whether small chunks work better"],
+        ["iTransformer-style", "Treats each variable as a token", "Checks inverted tokens; here we have only one variable"],
     ]
     story.append(make_table(architecture_rows, [35 * mm, 68 * mm, 69 * mm], styles, font_size=7.2))
     story.append(P(
-        "The PatchTST-style and iTransformer-style models are lightweight project adaptations built from "
-        "the same custom encoder, not reproductions of the authors' full official training recipes. "
-        "The iTransformer-style comparison is structurally disadvantaged here because a univariate series "
-        "creates only one variable token, leaving no cross-variate attention to learn.",
+        "Our PatchTST-style and iTransformer-style versions reuse our small custom encoder. They are not exact "
+        "copies of the full official research code. iTransformer normally compares several variables, but this "
+        "dataset has only one. That gives it only one variable token, so it cannot use its main advantage.",
         styles["caption"],
     ))
     story.append(PageBreak())
 
-    story.append(P("3. Mamdani layer and membership functions", styles["h1"]))
+    story.append(P("3. Mamdani fuzzy layer and curve shapes", styles["h1"]))
     story.append(P(
-        "Each hidden feature has an ordered low-to-high fuzzy rule base. Hidden values are bounded with "
-        "tanh, fuzzified against learnable centers and widths, and passed through Mamdani minimum "
-        "implication and maximum aggregation. Centroid defuzzification creates a crisp update that enters "
-        "through a learned residual gate.", styles["body"],
+        "The Mamdani layer turns each hidden number into fuzzy ideas such as low, medium, and high. It applies "
+        "rules to those ideas, combines the rule outputs, and turns them back into one normal number using the "
+        "center of the output shape. A learned gate controls how much this fuzzy answer changes the original "
+        "hidden value. The centers and widths can improve during training.", styles["body"],
     ))
     membership_image = ROOT / "outputs" / "ablation_study" / "membership_curves.png"
     if membership_image.is_file():
         story.append(image(membership_image, max_height=105 * mm))
-        story.append(P("Figure 1. Four differentiable membership families used for antecedents and consequents.", styles["caption"]))
+        story.append(P("Figure 1. The four fuzzy curve shapes tested for inputs and outputs.", styles["caption"]))
     formula_rows = [
-        ["Curve", "Membership degree for normalized distance d", "Property"],
-        ["Gaussian", "exp(-0.5 d^2)", "Smooth, nonzero tails"],
-        ["Triangular", "max(1 - |d|, 0)", "Compact and linear"],
-        ["Trapezoidal", "clip(1.5 - |d|, 0, 1)", "Flat core with linear shoulders"],
-        ["Parabolic", "max(1 - d^2, 0)", "Smooth compact support"],
+        ["Curve", "Formula for distance d", "Easy meaning"],
+        ["Gaussian", "exp(-0.5 d^2)", "Smooth bell curve; fades slowly"],
+        ["Triangular", "max(1 - |d|, 0)", "Straight sides and a sharp top"],
+        ["Trapezoidal", "clip(1.5 - |d|, 0, 1)", "Flat top with straight sides"],
+        ["Parabolic", "max(1 - d^2, 0)", "Rounded curve that reaches zero"],
     ]
     story.append(make_table(formula_rows, [30 * mm, 70 * mm, 72 * mm], styles, font_size=7.8))
     story.append(P(
-        "The comprehensive study tests all 16 antecedent/consequent pairings. Centers and antecedent "
-        "widths are learnable. Consequent shapes are fixed on a discretized output universe, keeping the "
-        "Mamdani rules interpretable.", styles["body"],
+        "We tested every possible pair of the four input curves and four output curves: 16 pairs in total. "
+        "The model learns the input-curve positions and widths. The output shapes stay fixed, which makes it "
+        "easier to understand what each fuzzy rule is doing.", styles["body"],
     ))
     story.append(PageBreak())
 
     story.append(P("4. Experiment matrix", styles["h1"]))
     matrix_rows = [
-        ["Family", "Settings", "Declared cases"],
-        ["Core factorial", "Mamdani vs FANTF+Mamdani x rules 3/5/7 x layers 1/2 x windows 5/10/20", "36"],
-        ["Curve pairs", "4 antecedent curves x 4 consequent curves", "16"],
+        ["Experiment group", "Choices compared", "Cases"],
+        ["Main combinations", "Mamdani or FANTF+Mamdani; rules 3/5/7; layers 1/2; windows 5/10/20", "36"],
+        ["Curve pairs", "4 input curves combined with 4 output curves", "16"],
         ["Fuzzy placement", "After attention, after feed-forward, both", "3"],
         ["Encoder depth", "1, 2, 3 layers", "3"],
         ["Sequence length", "5, 10, 20, 30 observations", "4"],
         ["FANTF delta", "0.1, 0.25, 0.5, 1.0", "4"],
-        ["Attention type", "Standard, FANTF, deterministic Gaussian fuzzy", "3"],
-        ["Backbone", "Transformer, PatchTST-style, iTransformer-style", "3"],
+        ["Attention type", "Normal, FANTF random fuzzy, distance-based fuzzy", "3"],
+        ["Model family", "Transformer, PatchTST-style, iTransformer-style", "3"],
         ["Total", "72 declared; duplicate base settings cached", "64 unique"],
     ]
     story.append(make_table(matrix_rows, [34 * mm, 112 * mm, 26 * mm], styles, font_size=7.5, highlight_rows=[9]))
     story.append(Spacer(1, 5 * mm))
     story.append(P("Training budgets", styles["h2"]))
     budget_rows = [
-        ["Phase", "Epochs", "Folds", "Seeds", "Observation count per configuration"],
-        ["Screening", "60", "2", "42, 52", "4 fold-seed results"],
-        ["Confirmation", "120", "3", "42, 52, 62", "9 fold-seed results"],
-        ["Held-out", "120", "374 test cases", "42, 52, 62", "3 complete prequential paths"],
+        ["Stage", "Training rounds", "Time splits", "Random seeds", "Results per model"],
+        ["Quick search", "60", "2", "42, 52", "4 results"],
+        ["Stronger recheck", "120", "3", "42, 52, 62", "9 results"],
+        ["Final test", "120", "374 test cases", "42, 52, 62", "3 full test runs"],
     ]
     story.append(make_table(budget_rows, [35 * mm, 24 * mm, 25 * mm, 37 * mm, 51 * mm], styles, font_size=7.6))
     story.append(P(
-        "Promotion rule: confirm the winner from each experiment family plus the overall top five unique "
-        "screening configurations. The primary ranking statistic is mean RMSE.", styles["body"],
+        "We moved the best model from each experiment group, plus the five best unique models overall, into "
+        "the stronger recheck. Models were ranked by average RMSE, where a smaller number is better.", styles["body"],
     ))
     story.append(PageBreak())
 
-    story.append(P("5. Screening results", styles["h1"]))
+    story.append(P("5. Quick-search results", styles["h1"]))
     group_winners = summary["screening_group_winners"]
-    group_rows = [["Experiment family", "Screening winner", "RMSE", "SD"]]
+    friendly_groups = {
+        "attention_type": "Attention type",
+        "backbone": "Model family",
+        "core_factorial": "Main combinations",
+        "curve_pairs": "Curve pairs",
+        "encoder_depth": "Number of layers",
+        "fantf_delta": "FANTF noise",
+        "fuzzy_placement": "Fuzzy position",
+        "sequence_length": "Past values used",
+    }
+    group_rows = [["Experiment group", "Quick-search winner", "RMSE", "SD"]]
     for row in sorted(group_winners, key=lambda item: item["rmse_mean"]):
         group_rows.append([
-            row["group"].replace("_", " ").title(),
+            friendly_groups[row["group"]],
             row["label"],
             f"{row['rmse_mean']:.4f}",
             f"{row['rmse_std']:.4f}",
@@ -656,60 +667,60 @@ def build_report() -> Path:
     story.append(Spacer(1, 4 * mm))
     story.append(image(charts["core"], max_height=112 * mm))
     story.append(P(
-        "Figure 2. The core screen favors one layer and a 10-observation window. More rules or a second "
-        "layer do not produce a uniform improvement. Screening values are selection evidence, not final test claims.",
+        "Figure 2. The quick search prefers one layer and 10 past values. Adding more rules or a second layer "
+        "does not always improve the score. These numbers help us choose finalists; they are not final test results.",
         styles["caption"],
     ))
     story.append(PageBreak())
 
-    story.append(P("6. Curve-pair comparison", styles["h1"]))
+    story.append(P("6. Comparing the fuzzy curve pairs", styles["h1"]))
     story.append(image(charts["curves"], max_height=128 * mm))
     story.append(P(
-        "Figure 3. Screening RMSE for every antecedent/consequent curve pair. Parabolic antecedents with "
-        "Gaussian consequents lead this short screen, while the earlier parabolic/triangular design remains competitive.",
+        "Figure 3. RMSE for all 16 fuzzy input/output curve pairs. In this quick test, parabolic inputs with "
+        "Gaussian outputs have the lowest error. Parabolic inputs with triangular outputs are still close.",
         styles["caption"],
     ))
     best_curves = sorted(
         [row for row in screening if row["group"] == "curve_pairs"],
         key=lambda row: numeric(row, "rmse_mean"),
     )[:6]
-    curve_rows = [["Rank", "Antecedent", "Consequent", "RMSE", "SD"]]
+    curve_rows = [["Rank", "Input curve", "Output curve", "RMSE", "SD"]]
     for index, row in enumerate(best_curves, start=1):
         curve_rows.append([index, row["antecedent_curve"], row["consequent_curve"],
                            f"{numeric(row, 'rmse_mean'):.4f}", f"{numeric(row, 'rmse_std'):.4f}"])
     story.append(make_table(curve_rows, [17 * mm, 46 * mm, 46 * mm, 31 * mm, 32 * mm], styles, font_size=7.7, highlight_rows=[1]))
     story.append(P(
-        "Important reversal: parabolic -> Gaussian wins the cheaper curve screen but ranks sixth during "
-        "full confirmation. The final winner returns to parabolic -> triangular with seven rules and a longer window. "
-        "This is exactly why a second confirmation stage is necessary.", styles["callout"],
+        "Important: the quick winner was not the final winner. Parabolic -> Gaussian won the curve screen but "
+        "finished sixth in the stronger recheck. The final winner used parabolic -> triangular, seven rules, and "
+        "10 past values. Rechecking the finalists stopped us from trusting one lucky quick result.", styles["callout"],
     ))
     story.append(PageBreak())
 
-    story.append(P("7. Placement, attention, depth, window, and backbone sweeps", styles["h1"]))
+    story.append(P("7. Comparing fuzzy position, attention, layers, history, and model family", styles["h1"]))
     story.append(image(charts["sweeps"], max_height=150 * mm))
-    story.append(P("Figure 4. One-factor screening sweeps. Error bars show variation across two folds and two seeds.", styles["caption"]))
+    story.append(P("Figure 4. A quick test of one choice at a time. The lines show how much results changed across two time splits and two random starts.", styles["caption"]))
     findings = [
-        ["Factor", "Observed screening pattern"],
-        ["Fuzzy placement", "After feed-forward leads; applying Mamdani twice adds parameters without a reliable gain."],
-        ["FANTF delta", "0.1 is the strongest tested noise scale; larger perturbations do not help consistently."],
-        ["Attention", "FANTF leads the short attention-only screen, but FANTF-only ranks eighth after confirmation."],
-        ["Depth", "One encoder layer is preferable for this 860-example series."],
-        ["Window", "Ten observations lead both screening and final selection."],
-        ["Backbone", "iTransformer-style wins the short backbone screen but finishes last in full confirmation."],
+        ["Choice", "What the quick test showed"],
+        ["Fuzzy position", "Putting Mamdani after feed-forward worked best. Using it twice added complexity without a clear gain."],
+        ["FANTF noise", "The smallest noise, 0.1, worked best. Stronger noise did not help."],
+        ["Attention", "FANTF won the quick attention test, but FANTF-only finished eighth in the stronger recheck."],
+        ["Layers", "One Transformer layer worked better than deeper models on this small dataset."],
+        ["Past values", "Using 10 past values won both the quick search and final model choice."],
+        ["Model family", "iTransformer-style won its quick test but finished last in the stronger recheck."],
     ]
     story.append(make_table(findings, [35 * mm, 137 * mm], styles, font_size=7.5))
     story.append(P(
-        "The iTransformer-style result should not be generalized to multivariate forecasting. With one input "
-        "variable it has one variable token, so the cross-variate attention mechanism that motivates iTransformer "
-        "cannot operate as intended.", styles["caption"],
+        "Do not use this result to judge iTransformer on normal multi-variable data. We have only one variable, "
+        "so iTransformer gets only one variable token and cannot compare variables as it normally would.", styles["caption"],
     ))
     story.append(PageBreak())
 
-    story.append(P("8. Full confirmation", styles["h1"]))
+    story.append(P("8. Stronger recheck of the finalists", styles["h1"]))
     story.append(image(charts["confirmation"], max_height=125 * mm))
     story.append(P(
-        "Figure 5. Nine promoted configurations rerun with 120 epochs, three chronological folds, and three seeds. "
-        "The dashed line is persistence on the same validation folds.", styles["caption"],
+        "Figure 5. We retrained nine finalists for longer, using three time-based data splits and three random "
+        "starting points. The dashed line shows persistence on exactly the same data. W means past values, R "
+        "means rules, para means parabolic, tria means triangular, and gaus means Gaussian.", styles["caption"],
     ))
     confirmation_sorted = sorted(confirmation, key=lambda row: numeric(row, "rmse_mean"))
     confirm_rows = [["Rank", "Configuration", "Params", "RMSE", "MAE", "r"]]
@@ -734,18 +745,18 @@ def build_report() -> Path:
         numeric(confirmation_sorted[1], "rmse_mean"),
     )
     story.append(P(
-        f"The winner's RMSE advantage over second place is only {difference:.2f}%. Standard-deviation intervals "
-        "overlap strongly, so the correct wording is 'selected by mean RMSE,' not 'proven superior.' The "
-        f"winner is also {100.0 * (float(winner_validation['rmse_mean']) - float(winner_validation['persistence_rmse_mean'])) / float(winner_validation['persistence_rmse_mean']):.2f}% worse than persistence on confirmation folds.",
+        f"The winner beats second place by only {difference:.2f}% RMSE. The run-to-run ranges overlap, so we "
+        "should say it had the best average score, not that it is definitely superior. It is also "
+        f"{100.0 * (float(winner_validation['rmse_mean']) - float(winner_validation['persistence_rmse_mean'])) / float(winner_validation['persistence_rmse_mean']):.2f}% worse than persistence on these validation splits.",
         styles["body"],
     ))
     story.append(PageBreak())
 
-    story.append(P("9. Held-out test results", styles["h1"]))
+    story.append(P("9. Final untouched test results", styles["h1"]))
     story.append(image(charts["heldout"], max_height=100 * mm))
     story.append(P(
-        "Figure 6. Historical BCM, API Transformer, and FANTF artifacts are single recorded runs. The selected "
-        "Mamdani bar reports the mean and SD of three seeds; persistence is deterministic.", styles["caption"],
+        "Figure 6. BCM, API Transformer, and FANTF are older saved results from one run each. The selected "
+        "Mamdani result is the average of three runs; its error bar shows how much those runs changed.", styles["caption"],
     ))
     heldout_table = [
         ["Metric", "Selected mean", "Seed SD", "Persistence", "Interpretation"],
@@ -762,79 +773,81 @@ def build_report() -> Path:
                           f"{numeric(row, 'pearson_r'):.4f}", f"{numeric(row, 'predictive_r_squared'):.4f}"])
     story.append(make_table(seed_rows, [24 * mm, 33 * mm, 33 * mm, 39 * mm, 43 * mm], styles, font_size=7.7))
     story.append(P(
-        f"The selected model uses {winner_validation['parameter_count']} trainable parameters. It beats the "
-        f"reproduced BCM artifact by {pct_lower(heldout['rmse']['mean'], bcm['rmse']):.2f}% RMSE, but does not "
-        "improve on persistence or the archived single-seed Transformer artifacts. The code also carries a "
-        "separate published/reference ieRSPOP++ RMSE of 1.8045; that value is not substituted for the reproduced "
-        "BCM artifact of 2.1420.", styles["body"],
+        f"The selected model has {winner_validation['parameter_count']} numbers that training can change. Its "
+        f"RMSE is {pct_lower(heldout['rmse']['mean'], bcm['rmse']):.2f}% lower than our reproduced BCM result. "
+        "It does not beat persistence or the two older one-run Transformer results. A separate published/reference "
+        "ieRSPOP++ RMSE of 1.8045 is also stored in the project, but it is not the same as our reproduced BCM "
+        "result of 2.1420.", styles["body"],
     ))
     story.append(PageBreak())
 
     story.append(P("10. Forecast behavior", styles["h1"]))
     story.append(image(charts["forecast"], max_height=115 * mm))
     story.append(P(
-        "Figure 7. The selected model follows broad volatility movement, while seed-to-seed spread is usually "
-        "small. Large local changes remain difficult, which helps explain why copying the latest value is strong.",
+        "Figure 7. The selected model follows the main movement of volatility, and the three runs are usually "
+        "close together. Sudden changes are harder to predict. That is one reason why simply copying the latest "
+        "value is difficult to beat.",
         styles["caption"],
     ))
     story.append(P("Why persistence is hard to beat", styles["h2"]))
     story.append(P(
-        "The volatility series is locally smooth and the forecast horizon is one step. Persistence has no "
-        "estimation variance and directly exploits that smoothness. The Transformer begins from persistence "
-        "through a residual connection, but a learned correction can still add error when the available 860 "
-        "examples do not support a stable nonlinear adjustment.", styles["body"],
+        "Nearby volatility values are usually similar, and we predict only one step ahead. Persistence takes "
+        "advantage of this by copying the latest value and has nothing to train. Our Transformer also starts from "
+        "that copied value and learns a correction. With only 860 examples, the correction can sometimes make a "
+        "good simple prediction worse.", styles["body"],
     ))
     story.append(P("What the Transformer still contributes", styles["h2"]))
     story.append(P(
-        "The experiment demonstrates an interpretable, trainable replacement for the BCM association path; "
-        "quantifies the value of fuzzy design choices; and provides a framework that can benefit from additional "
-        "variables, longer histories, or more data. The negative result against persistence is useful evidence, "
-        "not a failed experiment.", styles["body"],
+        "The experiment still gives us a trainable and understandable replacement for the BCM learning step. It "
+        "also shows which fuzzy choices helped and gives us code we can reuse with more variables or more data. "
+        "Finding that persistence is better is an honest and useful result, not a failed experiment.", styles["body"],
     ))
     story.append(PageBreak())
 
-    story.append(P("11. Limitations and threats to validity", styles["h1"]))
+    story.append(P("11. Limitations and what they mean", styles["h1"]))
     limitations = [
-        ["Issue", "Impact", "Mitigation / next step"],
-        ["Small univariate dataset", "Deep and multivariate backbones cannot show their intended strengths.", "Add exogenous variables or evaluate on a multivariate benchmark."],
-        ["Broad model search", "Even validation-only screening can favor noise.", "Use nested rolling validation or a second untouched dataset."],
-        ["Two-seed screening", "Early rankings are noisy.", "The family winners and top cases were rerun with three seeds and three folds."],
-        ["Historical baseline mismatch", "API and FANTF context uses one recorded seed, while the selected model uses three.", "Rerun all historical learned baselines with the same three seeds."],
-        ["Style adaptations", "PatchTST/iTransformer results are not official-paper replications.", "Use official repositories and benchmark training recipes for publication claims."],
-        ["iTransformer degeneracy", "One variable means one attention token.", "Retest with genuinely multivariate inputs."],
-        ["No statistical test", "Overlapping SDs prevent a strong superiority claim.", "Use paired errors across seeds/folds and a suitable paired test."],
+        ["Limitation", "Why it matters", "What to do next"],
+        ["Small one-variable dataset", "Deep and multi-variable models cannot show their full strengths.", "Add useful variables or test on a multi-variable dataset."],
+        ["Many models tested", "A model can look good by luck, even on validation data.", "Use another untouched dataset or a validation-inside-validation design."],
+        ["Only two seeds in quick search", "Early rankings can change.", "We reduced this problem by rechecking finalists with three seeds and three splits."],
+        ["Older results are not fully matched", "API and FANTF use one run, while our selected model uses three.", "Rerun every learned baseline with the same settings and seeds."],
+        ["Style adaptations", "Our PatchTST/iTransformer versions are not exact official-code copies.", "Use the official repos before making publication-level claims."],
+        ["One-variable iTransformer", "One variable creates only one attention token.", "Retest it with several real input variables."],
+        ["No formal significance test", "Overlapping ranges make a strong superiority claim unsafe.", "Compare paired errors and run a suitable paired statistical test."],
     ]
     story.append(make_table(limitations, [39 * mm, 62 * mm, 71 * mm], styles, font_size=7.2))
     story.append(Spacer(1, 5 * mm))
     story.append(P("Claims that are supported", styles["h2"]))
     claims = [
-        "All announced fuzzy/Transformer categories were implemented and evaluated under a staged protocol.",
-        "The 10-window, seven-rule parabolic/triangular Mamdani Transformer has the lowest confirmed mean RMSE among promoted candidates.",
-        "More depth, stronger FANTF noise, or additional fuzzy placements do not reliably improve this dataset.",
-        "Persistence remains the strongest held-out forecast in the current evidence.",
+        "We implemented and tested every fuzzy and Transformer group listed in the experiment plan.",
+        "Among tested Transformers, the 10-value, seven-rule parabolic/triangular Mamdani model has the lowest confirmed average RMSE.",
+        "Extra layers, stronger FANTF noise, and extra fuzzy positions did not reliably help this dataset.",
+        "Across every method, persistence has the lowest final-test RMSE in the current evidence.",
     ]
     story.append(make_table([["#", "Supported statement"]] + [[index + 1, claim] for index, claim in enumerate(claims)],
                             [12 * mm, 160 * mm], styles, font_size=8))
     story.append(PageBreak())
 
-    story.append(P("12. Conclusion and professor-ready explanation", styles["h1"]))
+    story.append(P("12. Conclusion: which model gave the best result?", styles["h1"]))
     story.append(P(
-        "The comprehensive experiment did not simply tune one fuzzy curve. It separated the main design axes, "
-        "screened 64 unique models, confirmed nine finalists, and evaluated one selected model on the held-out "
-        "test. The winning architecture is compact: one standard-attention encoder layer, a 10-value history, "
-        "seven parabolic-input/triangular-output Mamdani rules, and fuzzy inference after the feed-forward block.",
+        "We did more than compare four curve shapes. We tested 64 unique models, rechecked nine finalists, and "
+        "used the final untouched data only for the single selected model. <b>The best tested Transformer was "
+        "the standard-attention Mamdani Transformer</b>: one encoder layer, 10 past values, seven rules, parabolic "
+        "input curves, triangular output curves, and the fuzzy step after feed-forward processing. Its final-test "
+        f"RMSE was <b>{heldout['rmse']['mean']:.4f}</b>. <b>The best result overall was persistence</b>, with RMSE "
+        f"<b>{persistence_test:.4f}</b>, because lower RMSE is better.",
         styles["body"],
     ))
     story.append(P("Suggested 45-second explanation", styles["h2"]))
     script_text = (
-        "We built the Transformer internally from basic PyTorch layers, then added a differentiable Mamdani "
-        "system inside each encoder block. We tested 72 declared combinations covering rule counts, membership "
-        "curves, fuzzy placement, attention type, model depth, history length, and PatchTST/iTransformer-style "
-        "tokenizations. To avoid choosing from the test set, we screened on chronological validation folds, "
-        "fully confirmed nine finalists, and tested only the winner. The selected model uses one layer, ten past "
-        "values, and seven rules with parabolic antecedents and triangular consequents. It clearly improves over "
-        "the reproduced BCM result, but persistence is still better, so our conclusion is that the fuzzy "
-        "Transformer is a viable learned replacement rather than the best overall forecast on this small series."
+        "We built the Transformer parts ourselves using basic PyTorch tools and added a Mamdani fuzzy system "
+        "inside the encoder. We tested 72 planned cases covering curves, rule counts, fuzzy position, attention, "
+        "layers, history length, and three Transformer styles. We chose models using earlier time-based data and "
+        "used the final test only after choosing the winner. The best Transformer was the normal-attention Mamdani "
+        "model with one layer, ten past values, seven rules, parabolic input curves, and triangular output curves. "
+        "It was much better than our reproduced BCM result. However, persistence - simply copying the latest value "
+        "- was still best overall. Therefore, our fuzzy Transformer is a useful learned BCM replacement, but it is "
+        "not yet the most accurate forecast for this small dataset."
     )
     script_box = Table([[P(script_text, styles["callout"]) ]], colWidths=[172 * mm])
     script_box.setStyle(TableStyle([
@@ -849,10 +862,10 @@ def build_report() -> Path:
     story.append(Spacer(1, 6 * mm))
     story.append(P("Recommended next experiment", styles["h2"]))
     story.append(P(
-        "Freeze the selected architecture, rerun persistence, the API Transformer, FANTF-only, and the selected "
-        "Mamdani model across at least five identical seeds, and compare paired errors on the same chronological "
-        "folds. Then repeat on a genuinely multivariate volatility dataset where PatchTST and iTransformer can "
-        "operate in their intended regime.", styles["body"],
+        "Keep the winning design fixed. Then rerun persistence, the API Transformer, FANTF-only, and the winning "
+        "Mamdani model with at least five identical random seeds and the same time splits. Compare the errors from "
+        "matching runs. After that, test on a volatility dataset with several input variables so PatchTST and "
+        "iTransformer have a fairer chance to use their main strengths.", styles["body"],
     ))
     story.append(PageBreak())
 
@@ -919,8 +932,8 @@ def build_report() -> Path:
                             [12 * mm, 160 * mm], styles, font_size=7.2))
     story.append(Spacer(1, 5 * mm))
     story.append(P(
-        "Reproducibility note: all generated summary tables are derived from committed CSV/JSON artifacts. "
-        "The dataset itself is not committed to the repository and must be supplied separately.", styles["caption"],
+        "Reproduction note: every summary table comes from the saved CSV and JSON result files in this repository. "
+        "The original dataset is not stored in GitHub, so it must be provided separately to rerun training.", styles["caption"],
     ))
 
     document.build(story, onFirstPage=header_footer, onLaterPages=header_footer)
