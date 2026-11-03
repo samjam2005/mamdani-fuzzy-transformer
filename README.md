@@ -1,5 +1,12 @@
 # Custom FANTF-style Transformer with optional Mamdani layer fuzzification
 
+## Sector ETF and R-squared revision
+
+The latest financial extension uses XLK, XLE, XLV, XLP, and XLF instead of
+five individual stocks and ranks configurations by predictive R-squared. The
+complete method, ETF history limitation, 162-fit results, and reproduction
+commands are in [`SECTOR_ETF_R2_RESULTS.md`](SECTOR_ETF_R2_RESULTS.md).
+
 This folder is the Python implementation of the Week 8 milestone. It replaces
 the BCM association update in Aparna Iyer's `update_ron_online_rule.m` with a
 small Transformer that predicts next-day volatility.

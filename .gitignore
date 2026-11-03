@@ -8,6 +8,10 @@ outputs/
 output/
 tmp/
 
+# This generated table exceeds GitHub's 100 MB per-file limit. Keep the
+# equivalent compressed copy and rebuild it with build_financial_portfolio_dataset.py.
+data/processed/portfolio_transformer_features.csv
+
 # Local editor and operating-system metadata.
 .DS_Store
 .idea/

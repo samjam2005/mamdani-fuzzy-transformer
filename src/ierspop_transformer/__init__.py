@@ -1,6 +1,23 @@
 """Transformer replacement for the BCM learner in Aparna's ieRSPOP++."""
 
 from .config import ExperimentConfig
+from .data import (
+    COMPACT_CONTEXT_FEATURE_NAMES,
+    FinancialFeatureStandardizer,
+    FinancialFold,
+    FixedFinancialHoldout,
+    FinancialSequenceDataset,
+    PortfolioContextStandardizer,
+    fit_financial_feature_standardizer,
+    fit_portfolio_context_standardizer,
+    make_fixed_financial_holdout,
+    make_compact_context_control_dataset,
+    make_compact_portfolio_context_dataset,
+    make_financial_return_sequences,
+    make_portfolio_context_sequences,
+    make_purged_expanding_folds,
+    make_single_counter_control_dataset,
+)
 from .experiment import (
     run_experiment,
     run_ridge_experiment,
@@ -8,12 +25,41 @@ from .experiment import (
     run_rolling_validation,
     run_validation,
 )
+from .financial_experiment import (
+    FinancialTransformerConfig,
+    assert_mamdani_fuzzification,
+    build_financial_fuzzy_transformer,
+    financial_return_metrics,
+    out_of_sample_r_squared,
+    verify_financial_fuzzy_gradients,
+)
 
 __all__ = [
+    "COMPACT_CONTEXT_FEATURE_NAMES",
     "ExperimentConfig",
+    "FinancialFeatureStandardizer",
+    "FinancialFold",
+    "FixedFinancialHoldout",
+    "FinancialSequenceDataset",
+    "FinancialTransformerConfig",
+    "PortfolioContextStandardizer",
+    "assert_mamdani_fuzzification",
+    "build_financial_fuzzy_transformer",
+    "financial_return_metrics",
+    "out_of_sample_r_squared",
+    "fit_financial_feature_standardizer",
+    "fit_portfolio_context_standardizer",
+    "make_fixed_financial_holdout",
+    "make_compact_context_control_dataset",
+    "make_compact_portfolio_context_dataset",
+    "make_financial_return_sequences",
+    "make_portfolio_context_sequences",
+    "make_purged_expanding_folds",
+    "make_single_counter_control_dataset",
     "run_experiment",
     "run_ridge_experiment",
     "run_ridge_validation",
     "run_rolling_validation",
     "run_validation",
+    "verify_financial_fuzzy_gradients",
 ]

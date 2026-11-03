@@ -1,0 +1,208 @@
+{
+  "purpose": "Freeze one counter per sector before financial Transformer cross-validation without using evaluation-period information",
+  "selection_period": {
+    "requested_start": "1987-01-01",
+    "requested_end": "1999-12-31",
+    "first_available_date": "1987-01-02",
+    "last_available_date": "1999-12-31",
+    "aligned_return_observations": 3285
+  },
+  "model_evaluation_period": {
+    "start": "2000-01-01",
+    "end": "2026-10-23"
+  },
+  "leakage_control": {
+    "evaluation_period_used_for_selection": false,
+    "latest_selection_observation_is_before_evaluation_start": true
+  },
+  "candidate_universe": {
+    "entity_count": 25,
+    "sector_count": 5,
+    "combinations_evaluated": 3125
+  },
+  "selection": {
+    "tickers": [
+      "TXN",
+      "COP",
+      "ABT",
+      "KMB",
+      "WFC"
+    ],
+    "entities": [
+      "Texas Instruments",
+      "ConocoPhillips",
+      "Abbott Laboratories",
+      "Kimberly-Clark",
+      "Wells Fargo"
+    ],
+    "sectors": [
+      "Information Technology",
+      "Energy",
+      "Health Care",
+      "Consumer Staples",
+      "Financials"
+    ],
+    "mean_absolute_pairwise_return_correlation": 0.2481958436916602,
+    "maximum_absolute_pairwise_return_correlation": 0.3193936692656416,
+    "selection_rule": "one counter per sector minimizing mean absolute daily log-return correlation; maximum correlation breaks ties"
+  },
+  "pairwise_selected_stock_correlations": [
+    {
+      "left_ticker": "TXN",
+      "right_ticker": "COP",
+      "daily_log_return_correlation": 0.17401558534353972,
+      "absolute_correlation": 0.17401558534353972
+    },
+    {
+      "left_ticker": "TXN",
+      "right_ticker": "ABT",
+      "daily_log_return_correlation": 0.24704191517492827,
+      "absolute_correlation": 0.24704191517492827
+    },
+    {
+      "left_ticker": "TXN",
+      "right_ticker": "KMB",
+      "daily_log_return_correlation": 0.2505519598211913,
+      "absolute_correlation": 0.2505519598211913
+    },
+    {
+      "left_ticker": "TXN",
+      "right_ticker": "WFC",
+      "daily_log_return_correlation": 0.24373336308795313,
+      "absolute_correlation": 0.24373336308795313
+    },
+    {
+      "left_ticker": "COP",
+      "right_ticker": "ABT",
+      "daily_log_return_correlation": 0.2119670481222396,
+      "absolute_correlation": 0.2119670481222396
+    },
+    {
+      "left_ticker": "COP",
+      "right_ticker": "KMB",
+      "daily_log_return_correlation": 0.24425288534380737,
+      "absolute_correlation": 0.24425288534380737
+    },
+    {
+      "left_ticker": "COP",
+      "right_ticker": "WFC",
+      "daily_log_return_correlation": 0.20148105441516678,
+      "absolute_correlation": 0.20148105441516678
+    },
+    {
+      "left_ticker": "ABT",
+      "right_ticker": "KMB",
+      "daily_log_return_correlation": 0.29629662234487864,
+      "absolute_correlation": 0.29629662234487864
+    },
+    {
+      "left_ticker": "ABT",
+      "right_ticker": "WFC",
+      "daily_log_return_correlation": 0.3193936692656416,
+      "absolute_correlation": 0.3193936692656416
+    },
+    {
+      "left_ticker": "KMB",
+      "right_ticker": "WFC",
+      "daily_log_return_correlation": 0.29322433399725606,
+      "absolute_correlation": 0.29322433399725606
+    }
+  ],
+  "selected_stock_dominant_cycle_periods_trading_days": {
+    "TXN": [
+      182.61111111111114,
+      219.13333333333335,
+      113.3448275862069
+    ],
+    "COP": [
+      219.13333333333335,
+      182.61111111111114,
+      156.52380952380955
+    ],
+    "ABT": [
+      121.7037037037037,
+      172.94736842105263,
+      205.375
+    ],
+    "KMB": [
+      193.29411764705884,
+      149.36363636363637,
+      117.35714285714286
+    ],
+    "WFC": [
+      205.375,
+      142.86956521739128,
+      113.3103448275862
+    ]
+  },
+  "sector_return_correlations": {
+    "Information Technology": {
+      "Information Technology": 1.0,
+      "Energy": 0.39197113044647774,
+      "Health Care": 0.4753691390052041,
+      "Consumer Staples": 0.4966837896334346,
+      "Financials": 0.5121538973226287
+    },
+    "Energy": {
+      "Information Technology": 0.3919711304464778,
+      "Energy": 1.0,
+      "Health Care": 0.4138062301233951,
+      "Consumer Staples": 0.49499093531960997,
+      "Financials": 0.42319216126411113
+    },
+    "Health Care": {
+      "Information Technology": 0.4753691390052041,
+      "Energy": 0.41380623012339507,
+      "Health Care": 1.0,
+      "Consumer Staples": 0.6710353392966442,
+      "Financials": 0.5646137202635042
+    },
+    "Consumer Staples": {
+      "Information Technology": 0.49668378963343457,
+      "Energy": 0.49499093531961,
+      "Health Care": 0.671035339296644,
+      "Consumer Staples": 1.0,
+      "Financials": 0.6040830620958869
+    },
+    "Financials": {
+      "Information Technology": 0.5121538973226287,
+      "Energy": 0.42319216126411113,
+      "Health Care": 0.5646137202635042,
+      "Consumer Staples": 0.6040830620958869,
+      "Financials": 1.0
+    }
+  },
+  "sector_cycle_summary": {
+    "Information Technology": {
+      "median_dominant_period_trading_days": 219.06666666666663,
+      "minimum_dominant_period_trading_days": 182.55555555555554,
+      "maximum_dominant_period_trading_days": 234.85714285714286,
+      "mean_cycles_per_year": 1.2114713349271007
+    },
+    "Energy": {
+      "median_dominant_period_trading_days": 219.06666666666663,
+      "minimum_dominant_period_trading_days": 149.36363636363637,
+      "maximum_dominant_period_trading_days": 219.13333333333335,
+      "mean_cycles_per_year": 1.303642727645249
+    },
+    "Health Care": {
+      "median_dominant_period_trading_days": 173.0,
+      "minimum_dominant_period_trading_days": 121.7037037037037,
+      "maximum_dominant_period_trading_days": 193.29411764705884,
+      "mean_cycles_per_year": 1.5950422004017746
+    },
+    "Consumer Staples": {
+      "median_dominant_period_trading_days": 219.06666666666663,
+      "minimum_dominant_period_trading_days": 182.61111111111114,
+      "maximum_dominant_period_trading_days": 219.06666666666663,
+      "mean_cycles_per_year": 1.2269397454810549
+    },
+    "Financials": {
+      "median_dominant_period_trading_days": 205.375,
+      "minimum_dominant_period_trading_days": 182.55555555555554,
+      "maximum_dominant_period_trading_days": 219.06666666666663,
+      "mean_cycles_per_year": 1.2730371272063299
+    }
+  },
+  "generated_at_utc": "2026-10-24T06:54:59+00:00"
+}

@@ -1,0 +1,46 @@
+{
+  "purpose": "Professor-specified one sector ETF per sector for Transformer forecasting",
+  "selection_period": {
+    "method": "No data-dependent selection; ETF tickers were specified by sector coverage",
+    "data_used_for_selection": false
+  },
+  "model_evaluation_period": {
+    "start": "1999-01-01",
+    "end": "2026-10-23"
+  },
+  "leakage_control": {
+    "evaluation_period_used_for_selection": false,
+    "selection_is_data_independent": true
+  },
+  "candidate_universe": {
+    "entity_count": 5,
+    "sector_count": 5,
+    "instrument_type": "sector ETF"
+  },
+  "selection": {
+    "tickers": [
+      "XLK",
+      "XLE",
+      "XLV",
+      "XLP",
+      "XLF"
+    ],
+    "entities": [
+      "State Street Technology Select Sector SPDR ETF",
+      "State Street Energy Select Sector SPDR ETF",
+      "State Street Health Care Select Sector SPDR ETF",
+      "State Street Consumer Staples Select Sector SPDR ETF",
+      "State Street Financial Select Sector SPDR ETF"
+    ],
+    "sectors": [
+      "Information Technology",
+      "Energy",
+      "Health Care",
+      "Consumer Staples",
+      "Financials"
+    ],
+    "selection_rule": "one State Street Select Sector SPDR ETF for each professor-requested sector"
+  },
+  "price_field_for_model": "adjusted_close",
+  "generated_at_utc": "2026-10-26T07:42:48+00:00"
+}

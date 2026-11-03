@@ -1,0 +1,129 @@
+{
+  "dataset": "Five State Street Select Sector SPDR ETFs",
+  "source": "Yahoo Finance chart API with official fund identity and inception dates verified against State Street",
+  "source_price_fields": [
+    "close",
+    "adjusted_close"
+  ],
+  "model_price_field": "adjusted_close",
+  "requested_download_start": "1998-12-01",
+  "requested_download_end": "2026-10-26",
+  "entity_count": 5,
+  "sector_count": 5,
+  "entities": [
+    {
+      "ticker": "XLK",
+      "name": "State Street Technology Select Sector SPDR ETF",
+      "sector": "Information Technology",
+      "official_inception": "1998-12-16",
+      "official_url": "https://www.ssga.com/us/en/individual/etfs/state-street-technology-select-sector-spdr-etf-xlk",
+      "first_observation": "1998-12-22",
+      "last_observation": "2026-10-23",
+      "observations": 7002
+    },
+    {
+      "ticker": "XLE",
+      "name": "State Street Energy Select Sector SPDR ETF",
+      "sector": "Energy",
+      "official_inception": "1998-12-16",
+      "official_url": "https://www.ssga.com/us/en/individual/etfs/state-street-energy-select-sector-spdr-etf-xle",
+      "first_observation": "1998-12-22",
+      "last_observation": "2026-10-23",
+      "observations": 7002
+    },
+    {
+      "ticker": "XLV",
+      "name": "State Street Health Care Select Sector SPDR ETF",
+      "sector": "Health Care",
+      "official_inception": "1998-12-16",
+      "official_url": "https://www.ssga.com/us/en/individual/etfs/state-street-health-care-select-sector-spdr-etf-xlv",
+      "first_observation": "1998-12-22",
+      "last_observation": "2026-10-23",
+      "observations": 7002
+    },
+    {
+      "ticker": "XLP",
+      "name": "State Street Consumer Staples Select Sector SPDR ETF",
+      "sector": "Consumer Staples",
+      "official_inception": "1998-12-16",
+      "official_url": "https://www.ssga.com/us/en/individual/etfs/state-street-consumer-staples-select-sector-spdr-etf-xlp",
+      "first_observation": "1998-12-22",
+      "last_observation": "2026-10-23",
+      "observations": 7002
+    },
+    {
+      "ticker": "XLF",
+      "name": "State Street Financial Select Sector SPDR ETF",
+      "sector": "Financials",
+      "official_inception": "1998-12-16",
+      "official_url": "https://www.ssga.com/us/en/individual/etfs/state-street-financial-select-sector-spdr-etf-xlf",
+      "first_observation": "1998-12-22",
+      "last_observation": "2026-10-23",
+      "observations": 7002
+    }
+  ],
+  "history_constraint": {
+    "earlier_requirement": "1980s data and at least 30 years",
+    "met_by_actual_etfs": false,
+    "reason": "The selected sector ETFs were launched in December 1998"
+  },
+  "rows": {
+    "ohlcv_long": 35010,
+    "transformer_features": 33670,
+    "aligned_return_observations": 7001
+  },
+  "features": [
+    "adjusted price at t",
+    "change in adjusted price at t",
+    "change in change in adjusted price at t"
+  ],
+  "lookbacks_trading_days": [
+    5,
+    10,
+    15
+  ],
+  "future_horizons_trading_days": [
+    5,
+    10,
+    15
+  ],
+  "normalization_windows_trading_days": [
+    20,
+    60,
+    252
+  ],
+  "absolute_pairwise_return_correlation": {
+    "mean": 0.539944102946248,
+    "maximum": 0.6258583757091066
+  },
+  "cycle_summary": {
+    "Information Technology": {
+      "dominant_period_trading_days": 179.53846153846155,
+      "cycles_per_year": 1.403598971722365
+    },
+    "Energy": {
+      "dominant_period_trading_days": 218.8125,
+      "cycles_per_year": 1.1516709511568124
+    },
+    "Health Care": {
+      "dominant_period_trading_days": 166.71428571428572,
+      "cycles_per_year": 1.511568123393316
+    },
+    "Consumer Staples": {
+      "dominant_period_trading_days": 170.78048780487805,
+      "cycles_per_year": 1.4755784061696657
+    },
+    "Financials": {
+      "dominant_period_trading_days": 225.87096774193552,
+      "cycles_per_year": 1.1156812339331619
+    }
+  },
+  "primary_model_metric": "predictive R squared (coefficient of determination)",
+  "secondary_diagnostics": [
+    "out-of-sample R squared versus zero-return persistence",
+    "RMSE",
+    "MAE",
+    "directional accuracy"
+  ],
+  "generated_at_utc": "2026-10-26T07:42:48+00:00"
+}
